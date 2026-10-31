@@ -92,6 +92,8 @@ async function loadSeason(){
   LIVE.compliance = comp.data || [];
   const dl = await sb.rpc("compliance_deadline", {p_season: yr, p_week: LIVE.season.current_week});
   LIVE.deadline = dl.data;
+  const pen = await sb.from("penalties").select("*").eq("season", yr).order("week", {ascending:false});
+  LIVE.penalties = pen.data || [];
   LIVE.revealed = null;
   if(LIVE.lastRevealed){
     const {data} = await sb.from("bid_results").select("*").eq("bid_week_id",LIVE.lastRevealed.id).order("priority");
@@ -227,7 +229,7 @@ function complianceBanner(teamId){
   if(!c || (!c.over_roster && !c.over_cap)) return "";
   const parts = [c.over_roster?`${c.over_roster} player${c.over_roster>1?"s":""} over the ${LIVE.season.roster_size}-man limit`:"", c.over_cap?`$${c.over_cap} over the $${LIVE.season.salary_cap} cap`:""].filter(Boolean).join(" and ");
   const late = LIVE.deadline && new Date() >= new Date(LIVE.deadline);
-  return `<div class="note" style="border-color:var(--red)">⚠️ <b>${esc(c.team)}</b> is ${parts}. ${late?`<b class="red">The Sunday 9:55 AM PT deadline has passed.</b>`:`Must be legal by <b>${fmtPT(LIVE.deadline)}</b>.`}</div>`;
+  return `<div class="note" style="border-color:var(--red)">⚠️ <b>${esc(c.team)}</b> is ${parts}. ${late?`<b class="red">The Sunday 9:55 AM PT deadline has passed.</b>`:`Must be legal by <b>${fmtPT(LIVE.deadline)}</b> or it's an <b>automatic loss</b> for the week and every player added since last Sunday is dropped.`}</div>`;
 }
 function complianceCard(){
   const bad = (LIVE.compliance||[]).filter(c=>c.over_roster||c.over_cap);
@@ -235,7 +237,16 @@ function complianceCard(){
     <div class="sm mut" style="margin-bottom:8px">Teams may be over until <b>${LIVE.deadline?fmtPT(LIVE.deadline):"Sunday 9:55 AM PT"}</b>.</div>
     ${bad.length?`<table><tr><th>Team</th><th class="r">Active</th><th class="r">Cap used</th><th>Issue</th></tr>${bad.map(c=>`<tr><td>${esc(c.team)}</td><td class="r">${c.active}</td><td class="r">${money(c.cap_used)}</td>
       <td class="red sm">${[c.over_roster?`+${c.over_roster} roster`:"", c.over_cap?`$${c.over_cap} over cap`:""].filter(Boolean).join(" · ")}</td></tr>`).join("")}</table>`
-      :`<div class="sm grn">All teams are legal.</div>`}</div>`;
+      :`<div class="sm grn">All teams are legal.</div>`}
+    ${(LIVE.penalties||[]).length?`<h3 style="margin-top:14px">Penalties</h3><table><tr><th>Wk</th><th>Team</th><th>Penalty</th><th>Forced drops</th>${LIVE.me.role==="commissioner"?"<th>Yahoo</th>":""}</tr>
+      ${LIVE.penalties.map(p=>`<tr><td>${p.week}</td><td>${esc(LIVE.teamsById[p.team_id])}</td><td class="red">Automatic loss</td>
+        <td class="sm">${(p.dropped||[]).map(d=>esc(d.name)+" ("+money(d.salary)+")").join(", ")||"—"}</td>
+        ${LIVE.me.role==="commissioner"?`<td><label class="sm"><input type="checkbox" ${p.applied_in_yahoo?"checked":""} onchange="markYahoo(${p.id},this.checked)"> entered</label></td>`:""}</tr>`).join("")}</table>`:""}
+  </div>`;
+}
+async function markYahoo(id, v){
+  const {error} = await sb.from("penalties").update({applied_in_yahoo:v}).eq("id",id);
+  if(error) return showErr(error); await loadSeason(); render();
 }
 function myRosterHTML(){
   const me = LIVE.me.team_id, cap = capInfo(me);
