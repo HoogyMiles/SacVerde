@@ -68,7 +68,7 @@ select claim_player(8, pg_temp.pid('Josh Jacobs'));                       -- nev
 reset role; select pg_temp.as_user(2); set role authenticated;
 select claim_player(8, pg_temp.pid('Josh Jacobs'));                       -- GB played Thu 10/29: kicked off
 
--- Week 9, Tritons is #1 on Henry and Chase. Fill Tritons to 15 active / $160 first.
+-- Week 9, Tritons is #1 on Henry and Chase. Fill Tritons to 15 active / $160 first (Henry at $20 -> 16 / $180).
 reset role;
 insert into roster_spots (season, team_id, player_id, salary)
  select 2026, pg_temp.tid('Tritons'), p.id, case when row_number() over () = 1 then 132 else 2 end
@@ -76,11 +76,12 @@ insert into roster_spots (season, team_id, player_id, salary)
   where p.pos='WR' and p.nfl_team in ('KC','LV','LAC','NYG') limit 15;
 select 'E10 Tritons active/cap: ' || count(*) || ' / $' || team_cap_used(pg_temp.tid('Tritons'),2026) from roster_spots where team_id=pg_temp.tid('Tritons');
 select pg_temp.as_user(2); set role authenticated;
-select claim_player(9, pg_temp.pid('Derrick Henry'));                     -- 16 players -> must drop
-select claim_player(9, pg_temp.pid('Derrick Henry'),
-  (select player_id from roster_spots where team_id=my_team_id() and salary=2 limit 1));   -- drop $2: cap 158+20=178 > 170
-select 'E11 ' || claim_player(9, pg_temp.pid('Derrick Henry'),
-  (select player_id from roster_spots where team_id=my_team_id() and salary=132 limit 1)); -- drop $132: OK
+select 'E11 grace period: ' || claim_player(9, pg_temp.pid('Derrick Henry'));   -- 16 players, $180: allowed before Sun 9:55am
+reset role;
+select 'E11b compliance: ' || string_agg(team||' active='||active||' cap=$'||cap_used||' over_roster='||over_roster||' over_cap=$'||over_cap, '; ') from team_compliance(2026) where over_roster>0 or over_cap>0;
+select 'E11c deadline week 8: ' || to_char(compliance_deadline(2026,8) at time zone 'America/Los_Angeles','Dy MM/DD HH24:MI') || ' | week 9: ' || to_char(compliance_deadline(2026,9) at time zone 'America/Los_Angeles','Dy MM/DD HH24:MI');
+select pg_temp.as_user(2); set role authenticated;
+select drop_player((select player_id from roster_spots where team_id=my_team_id() and salary=132 limit 1));  -- get legal
 reset role; select 'E12 Tritons after: ' || count(*) || ' players, $' || team_cap_used(pg_temp.tid('Tritons'),2026) from roster_spots where team_id=pg_temp.tid('Tritons');
 select pg_temp.as_user(2); set role authenticated;
 select drop_player(pg_temp.pid('Derrick Henry'));                         -- Executive Order

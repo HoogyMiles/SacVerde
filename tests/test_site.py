@@ -41,7 +41,9 @@ def handle(route, uid):
         if table.startswith("rpc/"):
             fn = table[4:]; args = json.loads(req.post_data or "{}")
             a = ", ".join(f"{k} => {lit(v)}" for k, v in args.items())
-            out = sql(f"select to_json(public.{fn}({a}));", uid)
+            setof = sql(f"select bool_or(proretset) from pg_proc where proname = {lit(fn)};") == "t"
+            q = (f"select coalesce(json_agg(t), '[]') from public.{fn}({a}) t;" if setof else f"select to_json(public.{fn}({a}));")
+            out = sql(q, uid)
             return route.fulfill(status=200, body=out or "null", headers={"content-type": "application/json"})
         P = dict(params)
         if req.method == "GET":
@@ -149,6 +151,7 @@ with sync_playwright() as p:
     btn.click(); pg.wait_for_timeout(1000)
     body = pg.inner_text("body")
     check("claim succeeds and shows on roster", "Jauan Jennings added at $9." in body and "ADDED: POOL BOY · $9" in body.upper(), body[:900])
+    check("over-cap warning banner with Sunday deadline", "is $4 over the $170 cap" in body and "Must be legal by Sun, Nov 1, 9:55 AM PT" in body, body[:1500])
     pg.locator("tr:has-text('Jauan Jennings') button:has-text('drop')").last.click(); pg.wait_for_timeout(1000)
     check("Executive Order blocks same-week drop", "Executive Order" in pg.inner_text("body"))
     pg.screenshot(path="/home/claude/e2e/claim.png", full_page=True)

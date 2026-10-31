@@ -88,6 +88,10 @@ async function loadSeason(){
     const {data} = await sb.from("bids").select("player_id,amount,updated_at").eq("bid_week_id",LIVE.bidWeek.id).eq("team_id",LIVE.me.team_id);
     (data||[]).forEach(b=>LIVE.myBids[b.player_id]=b);
   }
+  const comp = await sb.rpc("team_compliance", {p_season: yr});
+  LIVE.compliance = comp.data || [];
+  const dl = await sb.rpc("compliance_deadline", {p_season: yr, p_week: LIVE.season.current_week});
+  LIVE.deadline = dl.data;
   LIVE.revealed = null;
   if(LIVE.lastRevealed){
     const {data} = await sb.from("bid_results").select("*").eq("bid_week_id",LIVE.lastRevealed.id).order("priority");
@@ -165,7 +169,7 @@ vBids = function(){
   </table></div>`:""}
   `) : ""}
   ${state.bidTab==='reveal' ? revealHTML() : ""}
-  ${state.bidTab!=='rules' ? myRosterHTML() : ""}
+  ${state.bidTab!=='rules' ? complianceBanner(LIVE.me.team_id) + myRosterHTML() : ""}
   ${state.bidTab==='rules' ? bidRulesHTML() : ""}`;
 };
 async function placeBid(pid, val){
@@ -217,6 +221,21 @@ async function dropPlayer(pid){
   const {data, error} = await sb.rpc("drop_player", {p_player:pid});
   if(error) return showErr(error);
   await loadSeason(); flash(data);
+}
+function complianceBanner(teamId){
+  const c = (LIVE.compliance||[]).find(x=>x.team_id===teamId);
+  if(!c || (!c.over_roster && !c.over_cap)) return "";
+  const parts = [c.over_roster?`${c.over_roster} player${c.over_roster>1?"s":""} over the ${LIVE.season.roster_size}-man limit`:"", c.over_cap?`$${c.over_cap} over the $${LIVE.season.salary_cap} cap`:""].filter(Boolean).join(" and ");
+  const late = LIVE.deadline && new Date() >= new Date(LIVE.deadline);
+  return `<div class="note" style="border-color:var(--red)">⚠️ <b>${esc(c.team)}</b> is ${parts}. ${late?`<b class="red">The Sunday 9:55 AM PT deadline has passed.</b>`:`Must be legal by <b>${fmtPT(LIVE.deadline)}</b>.`}</div>`;
+}
+function complianceCard(){
+  const bad = (LIVE.compliance||[]).filter(c=>c.over_roster||c.over_cap);
+  return `<div class="card"><h3>Roster & Cap Compliance</h3>
+    <div class="sm mut" style="margin-bottom:8px">Teams may be over until <b>${LIVE.deadline?fmtPT(LIVE.deadline):"Sunday 9:55 AM PT"}</b>.</div>
+    ${bad.length?`<table><tr><th>Team</th><th class="r">Active</th><th class="r">Cap used</th><th>Issue</th></tr>${bad.map(c=>`<tr><td>${esc(c.team)}</td><td class="r">${c.active}</td><td class="r">${money(c.cap_used)}</td>
+      <td class="red sm">${[c.over_roster?`+${c.over_roster} roster`:"", c.over_cap?`$${c.over_cap} over cap`:""].filter(Boolean).join(" · ")}</td></tr>`).join("")}</table>`
+      :`<div class="sm grn">All teams are legal.</div>`}</div>`;
 }
 function myRosterHTML(){
   const me = LIVE.me.team_id, cap = capInfo(me);
@@ -295,7 +314,7 @@ async function refreshForum(){ await loadForum(); if(state.view==="forum") rende
 // ---------- FRONT OFFICE: commissioner tools ----------
 const _vOffice = vOffice;
 vOffice = function(){
-  if(LIVE.me.role!=="commissioner") return _vOffice();
+  if(LIVE.me.role!=="commissioner") return complianceCard() + `<div style="margin-top:20px">${_vOffice()}</div>`;
   const nextTue = (()=>{ const d=new Date(); const dow=d.getDay(); d.setDate(d.getDate()+((2-dow+7)%7||7)); d.setHours(21,0,0,0);
     const p=n=>String(n).padStart(2,"0"); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T21:00`; })();
   const w = LIVE.bidWeek, c = LIVE.closedWeek;
@@ -314,6 +333,7 @@ vOffice = function(){
     <div class="card"><h3>Season</h3><div class="sm" style="line-height:2">Season <b>${LIVE.season.year}</b> · current week <b>${LIVE.season.current_week}</b> · cap <b>$${LIVE.season.salary_cap}</b><br>
       2026 rosters loaded: <b>${LIVE.roster26.length} players</b>${LIVE.roster26.length?"":" — waiting on the Google Sheet import"}</div></div>
   </div>
+  <div style="margin-top:14px">${complianceCard()}</div>
   <div style="margin-top:20px">${_vOffice()}</div>`;
 };
 async function openWeek(){
