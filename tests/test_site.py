@@ -28,6 +28,7 @@ def where(params):
         if k in ("select", "order", "limit", "offset", "on_conflict", "columns"): continue
         op, _, val = v.partition(".")
         if op == "eq": w.append(f"{k} = {lit(val)}")
+        if op == "in": w.append(f"{k} in (" + ",".join(lit(x) if not x.isdigit() else x for x in val.strip("()").split(",")) + ")")
     return (" where " + " and ".join(w)) if w else ""
 
 def handle(route, uid):
@@ -126,8 +127,12 @@ with sync_playwright() as p:
     pg.wait_for_function("document.body.innerText.includes('Sealed: Jauan Jennings')", timeout=15000)
     body = pg.inner_text("body")
     check("valid bid sealed and listed", "Sealed: Jauan Jennings for $8" in body and "YOUR SEALED BIDS · WEEK 9 (2)" in body.upper(), body[:800])
+    pg.evaluate("go('myteam')"); pg.wait_for_timeout(500)
+    check("bid receipt alert on My Team", "Bid saved: Jauan Jennings for $8" in pg.inner_text("body"))
     pg.evaluate("go('forum')"); pg.wait_for_timeout(400)
-    pg.fill("#chatmsg", "Testing the new forum 🔥"); pg.click("text=Send"); pg.wait_for_function("document.querySelector('#chatlog') && document.querySelector('#chatlog').innerText.includes('Testing the new forum')", timeout=15000)
+    pg.fill("#chatmsg", "Testing the new forum 🔥"); pg.click("button:has-text('Send')")
+    try: pg.wait_for_function("document.querySelector('#chatlog') && document.querySelector('#chatlog').innerText.includes('Testing the new forum')", timeout=15000)
+    except Exception: print("FORUM DEBUG:", pg.inner_text("#app")[:600].replace("\n"," | "), errs)
     check("forum post saved", "Testing the new forum" in pg.inner_text("#chatlog"))
     pg.screenshot(path="/home/claude/e2e/forum.png")
     check("no JS errors (Purple Reign)", not errs, "; ".join(errs))
@@ -150,7 +155,7 @@ with sync_playwright() as p:
     # fast-forward the deadline, then reveal
     sql("alter table bid_weeks disable trigger bid_week_guard; update bid_weeks set bids_close_at = now() - interval '1 minute' where status='open'; alter table bid_weeks enable trigger bid_week_guard;")
     pg.reload(); pg.wait_for_function("document.querySelector('#nav').innerText.includes('sign out')", timeout=30000); pg.evaluate("go('office')"); pg.wait_for_timeout(400)
-    pg.click("text=Reveal week 9 bids"); pg.wait_for_timeout(1200)
+    pg.click("button:has-text('Reveal week 9 bids')"); pg.wait_for_function("document.body.innerText.includes('Week 9 reveal')", timeout=20000)
     body = pg.inner_text("body")
     check("reveal shows Jauan Jennings with Pool Boy #1 ($9) over Purple Reign ($8)",
           re.search(r"Jauan Jennings[\s\S]*#1\s+Pool Boy\s+\$9[\s\S]*#2\s+Purple Reign\s+\$8", body) is not None, body[:1200])
@@ -183,9 +188,10 @@ with sync_playwright() as p:
     check("no JS errors (Purple Reign trade)", not errs, "; ".join(errs))
     pg, errs = page_as(br, "hoogy")
     pg.evaluate("go('myteam')"); pg.wait_for_timeout(500)
+    check("trade offer alert shows for Hoogy", "Trade offer from Purple Reign" in pg.inner_text("body"))
     check("Hoogy sees the offer", "OFFERS TO YOU" in pg.inner_text("body").upper() and "Jerry Jeudy" in pg.inner_text("body"))
-    pg.click("text=Accept"); pg.wait_for_function("document.body.innerText.includes('goes to the commissioner')", timeout=15000)
-    pg.click("text=Approve"); pg.wait_for_function("document.body.innerText.includes('Trade approved')", timeout=15000)
+    pg.click("button:has-text('Accept')"); pg.wait_for_function("document.body.innerText.includes('goes to the commissioner')", timeout=15000)
+    pg.click("button:has-text('Approve')"); pg.wait_for_function("document.body.innerText.includes('Trade approved')", timeout=15000)
     body = pg.inner_text("body")
     check("approved trade moves Jeudy to Hoogy's roster", "Jerry Jeudy" in pg.inner_text(".card:has-text('Your 2026 Roster')"), body[:800])
     check("trade log shows the pick", "2027 5th (Purple Reign)" in pg.inner_text("body") or "2027 5TH (PURPLE REIGN)" in pg.inner_text("body").upper())

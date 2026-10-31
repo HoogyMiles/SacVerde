@@ -252,6 +252,8 @@ async function loadSeason(){
     sb.from("trade_picks").select("*")]);
   LIVE.picks = dp.data||[]; LIVE.tradePicks = tp.data||[];
   const tdl = await sb.rpc("trade_deadline", {p_season: yr}); LIVE.tradeDeadline = tdl.data;
+  const nt = await sb.from("notifications").select("id,kind,title,body,view,created_at,read_at").order("created_at",{ascending:false}).limit(60);
+  LIVE.notes = nt.data||[];
   const comp = await sb.rpc("team_compliance", {p_season: yr});
   LIVE.compliance = comp.data || [];
   const dl = await sb.rpc("compliance_deadline", {p_season: yr, p_week: LIVE.season.current_week});
@@ -465,8 +467,21 @@ function flashHTML(){ const f=state.flash; if(!f) return ""; state.flash=null; r
 function vMyTeam(){
   return `<h1>My Team · ${esc(state.team)}</h1>
   <div class="sub">Roster moves and trades. IR: max ${LIVE.season.max_ir}, ${LIVE.season.ir_min_weeks}-week minimum, half salary counts. Taxi: max ${LIVE.season.max_taxi}, rookies only, off the cap.</div>
-  ${flashHTML()}${complianceBanner(LIVE.me.team_id)}${myRosterHTML()}
+  ${flashHTML()}${complianceBanner(LIVE.me.team_id)}${alertsHTML()}${myRosterHTML()}
   <h2>Trades</h2>${tradesHTML()}`;
+}
+function alertsHTML(){
+  const ns = (LIVE.notes||[]).slice(0,12); if(!ns.length) return "";
+  const unread = ns.filter(n=>!n.read_at).map(n=>n.id);
+  if(unread.length) setTimeout(markRead, 1500, unread);
+  return `<div class="card" style="margin-bottom:14px"><h3>Alerts</h3>${ns.map(n=>`<div style="padding:7px 0;border-bottom:1px solid var(--line)${n.read_at?";opacity:.7":""}">
+    <div class="spread"><b class="sm">${n.read_at?"":"● "}${esc(n.title)}</b><span class="sm mut2">${fmtTime(n.created_at)}</span></div>
+    ${n.body?`<div class="sm mut" style="white-space:pre-line">${esc(n.body)}</div>`:""}
+    ${n.view && n.view!=="myteam"?`<a class="sm" onclick="go('${n.view}')${n.view==="bids"?";state.bidTab='reveal'":""}">open →</a>`:""}</div>`).join("")}</div>`;
+}
+async function markRead(ids){
+  await sb.from("notifications").update({read_at:new Date().toISOString()}).in("id", ids);
+  (LIVE.notes||[]).forEach(n=>{ if(ids.includes(n.id)) n.read_at = new Date().toISOString(); }); nav();
 }
 function tradeLine(t){
   const items = LIVE.tradeItems.filter(i=>i.trade_id===t.id);
@@ -623,9 +638,9 @@ async function revealWeek(id){
 const NFL_ABBR = ["ARI","ATL","BAL","BUF","CAR","CHI","CIN","CLE","DAL","DEN","DET","GB","HOU","IND","JAX","KC","LAC","LAR","LV","MIA","MIN","NE","NO","NYG","NYJ","PHI","PIT","SEA","SF","TB","TEN","WAS","FA"];
 function adminHTML(){
   const tab = state.adminTab || "results";
-  const tabs = [["results","Scores"],["players","Players & Rosters"],["picks","Draft Picks"],["logins","Logins"],["backup","Backup"]];
+  const tabs = [["results","Scores"],["players","Players & Rosters"],["picks","Draft Picks"],["logins","Logins"],["email","Email"],["backup","Backup"]];
   return `<div class="tabs">${tabs.map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="state.adminTab='${k}';render()">${l}</button>`).join("")}</div>
-  <div class="card">${({results:adminResults, players:adminPlayers, picks:adminPicks, logins:adminLogins, backup:adminBackup})[tab]()}</div>`;
+  <div class="card">${({results:adminResults, players:adminPlayers, picks:adminPicks, logins:adminLogins, email:adminEmail, backup:adminBackup})[tab]()}</div>`;
 }
 async function adminCall(fn, args, after){
   const {data, error} = await sb.rpc(fn, args);
@@ -709,6 +724,21 @@ function adminLogins(){
     <input type="text" id="nm_name" placeholder="name"> <button class="btn sm" onclick="adminCall('admin_set_member',{p_email:$('#nm_email').value,p_team:+$('#nm_team').value,p_name:$('#nm_name').value},reloadMembers)">Add login</button></div>`;
 }
 async function reloadMembers(){ const {data} = await sb.from("league_members").select("email,team_id,role,user_id,display_name,phone"); LIVE.members = data||[]; }
+function adminEmail(){
+  const st = state.emailStatus;
+  if(!st){ sb.rpc("email_status").then(({data})=>{ state.emailStatus = data || {}; if(state.adminTab==="email") render(); }); return `<div class="sm mut">Checking…</div>`; }
+  const ok = st.pg_net && st.api_key && st.provider;
+  const yes = b=>b?'<span class="pill g">yes</span>':'<span class="pill r">no</span>';
+  return `<div class="sm" style="margin-bottom:10px">Every alert shows in the site (🔔). Email copies go out automatically once all three are set up:</div>
+  <table><tr><td>pg_net extension enabled</td><td>${yes(st.pg_net)}</td></tr><tr><td>Email service key saved in Supabase Vault</td><td>${yes(st.api_key)}</td></tr>
+    <tr><td>Provider and "from" address</td><td>${st.provider?esc(st.provider+" · "+(st.from||"")):'<span class="pill r">no</span>'}</td></tr>
+    <tr><td>Emails sent in the last 24 hours</td><td>${st.sent_last_24h||0}</td></tr></table>
+  <div class="flex sm" style="margin-top:10px;flex-wrap:wrap;gap:6px">Provider <select id="em_p"><option ${st.provider==="resend"?"selected":""}>resend</option><option ${st.provider==="brevo"?"selected":""}>brevo</option><option>off</option></select>
+    From <input type="text" id="em_f" value="${esc(st.from||"")}" placeholder="SacVerde <alerts@yourdomain.com>" style="width:240px">
+    Site <input type="text" id="em_s" value="${esc(st.site_url||location.origin)}" style="width:200px">
+    <button class="btn sm" onclick="state.emailStatus=null;adminCall('admin_email_setup',{p_provider:$('#em_p').value,p_from:$('#em_f').value,p_site_url:$('#em_s').value})">Save</button></div>
+  <div class="sm mut2" style="margin-top:8px">${ok?"Email copies are on.":"The service's API key is entered only in Supabase (SQL Editor), never on this site."}</div>`;
+}
 function adminBackup(){
   return `<div class="sm" style="margin-bottom:10px">Downloads everything in the league database as one file: rosters, salaries, picks, results, revealed bids, trades, the transaction log and the forum. Sealed bids for an open week are not included. Save it to your SacVerde folder once a week.</div>
   <button class="btn" onclick="downloadBackup()">Download backup</button>`;
@@ -724,8 +754,9 @@ async function downloadBackup(){
 
 // ---------- header + boot ----------
 const _nav = nav;
-nav = function(){ _nav(); if(LIVE.me) $("#nav").insertAdjacentHTML("beforeend",
-  `<span class="sm mut" style="margin-left:10px;white-space:nowrap">${esc(state.team)}${LIVE.me.role==="commissioner"?" · commish":""} · <a onclick="signOut()">sign out</a></span>`); };
+nav = function(){ _nav(); if(LIVE.me){ const unread = (LIVE.notes||[]).filter(n=>!n.read_at).length;
+  $("#nav").insertAdjacentHTML("beforeend",
+  `<span class="sm mut" style="margin-left:10px;white-space:nowrap"><a onclick="go('myteam')" title="Alerts">🔔${unread?` <b class="red">${unread}</b>`:""}</a> · ${esc(state.team)}${LIVE.me.role==="commissioner"?" · commish":""} · <a onclick="signOut()">sign out</a></span>`); } };
 
 async function boot(){
   $("#app").innerHTML = `<div class="sub" style="padding:40px;text-align:center">Loading SacVerde…</div>`;
