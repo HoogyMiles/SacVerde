@@ -1,0 +1,1733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SacVerde Fantasy Football League</title>
+<style>
+:root{
+  /* GameStop palette: black / red / white */
+  --bg:#0a0a0b; --panel:#141416; --panel2:#1c1c1f; --line:#2b2b30;
+  --green:#ee3a2e; --green-dim:#9c1712; --gold:#ffffff; --red:#ff7a70;
+  --txt:#f4f4f5; --mut:#a9a9af; --mut2:#707078;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.45}
+a{color:var(--green);text-decoration:none;cursor:pointer}
+header{position:sticky;top:0;z-index:50;background:#111114;border-bottom:1px solid var(--line)}
+.hwrap{max-width:1200px;margin:0 auto;padding:0 20px;display:flex;align-items:center;gap:24px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:10px;padding:14px 0;font-weight:800;font-size:20px;letter-spacing:.5px}
+.logo .sv{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,var(--green),#7a100c);display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;font-weight:900}
+.logo em{font-style:normal;color:var(--green)}
+nav{display:flex;gap:2px;flex-wrap:wrap}
+nav button{background:none;border:none;color:var(--mut);font-size:14px;font-weight:600;padding:18px 14px;cursor:pointer;border-bottom:2px solid transparent}
+nav button:hover{color:var(--txt)}
+nav button.on{color:var(--green);border-bottom-color:var(--green)}
+main{max-width:1200px;margin:0 auto;padding:26px 20px 80px}
+h1{font-size:26px;margin-bottom:4px}
+h2{font-size:17px;margin:26px 0 12px;color:var(--txt)}
+h2 .sub,{font-weight:400}
+.sub{color:var(--mut);font-size:13px}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.card h3{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--mut);margin-bottom:10px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{color:var(--mut2);font-size:11px;text-transform:uppercase;letter-spacing:.8px;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:7px 8px;border-bottom:1px solid #202024}
+tr:last-child td{border-bottom:none}
+td.r,th.r{text-align:right}
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+.pill.g{background:#38100d;color:var(--green)}
+.pill.y{background:#2b2b30;color:#fff}
+.pill.r{background:#2b2b30;color:var(--red)}
+.pill.b{background:#26262b;color:#c9c9cf}
+.pos{display:inline-block;width:34px;text-align:center;padding:2px 0;border-radius:5px;font-size:11px;font-weight:800}
+.pos.QB{background:#3d0f0b;color:#ff8b82}.pos.RB{background:#2b2b30;color:#fff}
+.pos.WR{background:#2b1a1c;color:#e8b4b0}.pos.TE{background:#232327;color:#c9c9cf}
+.pos.K{background:#1c1c1f;color:#8f8f96;border:1px solid #2b2b30}.pos.DST{background:#1c1c1f;color:#8f8f96;border:1px solid #2b2b30}
+.big{font-size:28px;font-weight:800}
+.stat{display:flex;flex-direction:column;gap:2px}
+.stat .lbl{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--mut2)}
+.hero{background:linear-gradient(135deg,#241012,#141416 60%);border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
+.champ{display:flex;align-items:center;gap:14px}
+.trophy{font-size:40px}
+.champ .name{font-size:22px;font-weight:800;color:var(--gold)}
+.btn{background:var(--green);color:#fff;border:none;padding:9px 16px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--green);border:1px solid var(--green-dim)}
+.btn.sm{padding:5px 10px;font-size:12px}
+.btn:disabled{opacity:.4;cursor:default}
+select,input[type=text],input[type=number]{background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:8px 10px;border-radius:8px;font-size:14px}
+input[type=number]{width:76px}
+.tabs{display:flex;gap:8px;margin:14px 0;flex-wrap:wrap}
+.tabs button{background:var(--panel2);border:1px solid var(--line);color:var(--mut);padding:7px 14px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer}
+.tabs button.on{background:var(--green);color:#fff;border-color:var(--green)}
+.bar{height:10px;background:#202024;border-radius:6px;overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--green-dim),var(--green))}
+.flex{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spread{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.mut{color:var(--mut)} .mut2{color:var(--mut2)} .gold{color:var(--gold)} .grn{color:var(--green)} .red{color:var(--red)}
+.sm{font-size:12px}
+.scorebox{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);cursor:pointer}
+.scorebox:hover{border-color:var(--green-dim)}
+.scorebox .t{font-weight:600;font-size:13.5px}
+.scorebox .s{font-weight:800;font-size:15px}
+.win{color:var(--green)}
+.lose{color:var(--mut2)}
+.lock{font-size:11px;color:#fff;background:#38100d;padding:3px 9px;border-radius:12px;display:inline-block}
+.note{background:#1d1315;border-left:3px solid var(--green);padding:10px 14px;border-radius:0 8px 8px 0;font-size:13px;color:var(--mut);margin:10px 0}
+.warn{color:var(--red);font-size:11px;font-weight:700}
+.matchhead{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;text-align:center;padding:18px;background:var(--panel2);border-radius:12px;margin-bottom:14px}
+.matchhead .mscore{font-size:38px;font-weight:900}
+.matchhead .vs{color:var(--mut2);font-weight:700}
+.wp{height:8px;border-radius:5px;background:#2b2b30;overflow:hidden;margin-top:10px}
+.wp i{display:block;height:100%;background:var(--green)}
+.ticker{font-size:12.5px;color:var(--mut);border:1px dashed var(--line);border-radius:8px;padding:8px 12px;margin-top:10px;min-height:34px}
+.live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:6px;animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.bracket{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;position:relative}
+.bracket-col{display:flex;flex-direction:column;justify-content:space-around;padding:0 14px;position:relative}
+.bracket-col:first-child{padding-left:0}
+.bracket-col:last-child{padding-right:0}
+.bgame{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px;position:relative}
+.bgame div{display:flex;justify-content:space-between;padding:3px 0}
+.bgame .bseed{position:absolute;left:-22px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--mut2);font-weight:700}
+.rnd{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--mut2);margin-bottom:8px;text-align:center}
+.bslot{position:relative;padding:6px 0}
+.bslot:after{content:'';position:absolute;right:-14px;top:50%;width:14px;height:0;border-top:2px solid var(--line)}
+.bracket-col:last-child .bslot:after{display:none}
+.bconn{position:absolute;right:-14px;border:2px solid var(--line);border-left:none;border-radius:0 8px 8px 0;width:14px}
+.bconn-top{top:25%;height:50%}
+.bracket-col:last-child .bconn{display:none}
+.b3rd{margin-top:16px;padding-top:16px;border-top:1px dashed var(--line)}
+.dboard{overflow-x:hidden;margin-bottom:18px}
+.dboard table{border-collapse:separate;border-spacing:0;width:100%;table-layout:fixed}
+.dboard th{background:#111114;position:sticky;top:0;z-index:2;padding:4px 2px;font-size:9px;text-transform:uppercase;letter-spacing:.3px;color:var(--mut);border-bottom:2px solid var(--green-dim);white-space:nowrap;text-align:center}
+.dboard th:first-child{width:28px;position:sticky;left:0;z-index:3;background:#111114}
+.dboard td{padding:0;border:1px solid var(--line);vertical-align:top;text-align:center}
+.dboard td:first-child{position:sticky;left:0;z-index:1;background:var(--panel);font-weight:800;font-size:11px;color:var(--mut2);padding:6px 2px;text-align:center;border-right:2px solid var(--green-dim);width:28px}
+.dboard .dcell{padding:3px 2px;min-height:38px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:background .15s}
+.dboard .dcell:hover{background:var(--panel2)}
+.dboard .dcell .dp-name{font-size:10px;font-weight:700;color:var(--txt);line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.dboard .dcell .dp-meta{font-size:8px;color:var(--mut2)}
+.dboard .dcell .dp-pick{font-size:8px;color:var(--mut2);font-weight:600}
+.dboard .dcell.empty{opacity:.2}
+.dboard .dcell.hl{border:2px solid var(--green);box-shadow:0 0 6px var(--green-dim)}
+.dboard .dcell.pos-QB{background:#ffffff}.dboard .dcell.pos-QB .dp-name,.dboard .dcell.pos-QB .dp-pick,.dboard .dcell.pos-QB .dp-meta{color:#111}
+.dboard .dcell.pos-RB{background:#1a1a1a}.dboard .dcell.pos-RB .dp-name{color:#fff}.dboard .dcell.pos-RB .dp-pick,.dboard .dcell.pos-RB .dp-meta{color:#bbb}
+.dboard .dcell.pos-WR{background:#1b5e20}.dboard .dcell.pos-WR .dp-name{color:#fff}.dboard .dcell.pos-WR .dp-pick,.dboard .dcell.pos-WR .dp-meta{color:#c8e6c9}
+.dboard .dcell.pos-TE{background:#1565c0}.dboard .dcell.pos-TE .dp-name{color:#fff}.dboard .dcell.pos-TE .dp-pick,.dboard .dcell.pos-TE .dp-meta{color:#bbdefb}
+.dboard .dcell.pos-K{background:#6a1b9a}.dboard .dcell.pos-K .dp-name{color:#fff}.dboard .dcell.pos-K .dp-pick,.dboard .dcell.pos-K .dp-meta{color:#e1bee7}
+.dboard .dcell.pos-DST{background:#c2185b}.dboard .dcell.pos-DST .dp-name{color:#fff}.dboard .dcell.pos-DST .dp-pick,.dboard .dcell.pos-DST .dp-meta{color:#f8bbd0}
+.dboard tr td .dcell.pos-QB{background:#ffffff}
+.dboard tr.even td .dcell.pos-QB{background:#f0f0f0}
+.dboard tr.even td .dcell.pos-RB{background:#222}
+.dboard tr.even td .dcell.pos-WR{background:#236b27}
+.dboard tr.even td .dcell.pos-TE{background:#1a6fd4}
+.dboard tr.even td .dcell.pos-K{background:#7b22ad}
+.dboard tr.even td .dcell.pos-DST{background:#d42868}
+.byteam-QB{background:#ffffff;color:#111}.byteam-RB{background:#1a1a1a;color:#fff}.byteam-WR{background:#1b5e20;color:#fff}.byteam-TE{background:#1565c0;color:#fff}.byteam-K{background:#6a1b9a;color:#fff}.byteam-DST{background:#c2185b;color:#fff}
+.byteam-QB .mut{color:#555!important}.byteam-RB .mut{color:#bbb!important}.byteam-WR .mut{color:#c8e6c9!important}.byteam-TE .mut{color:#bbdefb!important}.byteam-K .mut{color:#e1bee7!important}.byteam-DST .mut{color:#f8bbd0!important}
+.dboard tr.even td{background:var(--panel2)}
+.dboard tr.even td:first-child{background:var(--panel2)}
+.teamgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.tcard{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;cursor:pointer;transition:border-color .15s}
+.tcard:hover{border-color:var(--green)}
+.tcard .tn{font-weight:700;font-size:14px}
+.footer-cta{margin-top:40px;text-align:center;color:var(--mut2);font-size:12.5px}
+.searchrow{display:flex;gap:10px;margin:12px 0;flex-wrap:wrap}
+.searchrow input[type=text]{flex:1;min-width:200px}
+.badge{font-size:10px;font-weight:800;padding:2px 6px;border-radius:4px;background:#2b2b30;color:#fff;vertical-align:middle;margin-left:6px}
+/* ---- forum / chat ---- */
+.chatwrap{display:flex;flex-direction:column;height:calc(100vh - 300px);min-height:440px;margin-top:14px}
+.chatlog{flex:1;overflow-y:auto;padding:16px;background:var(--panel2);border:1px solid var(--line);border-radius:12px 12px 0 0}
+.msg{display:flex;gap:10px;margin-bottom:14px}
+.msg .av{width:34px;height:34px;border-radius:50%;background:#38100d;color:var(--green);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;flex-shrink:0;border:1px solid var(--green-dim)}
+.msg .bub{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;max-width:75%;min-width:80px}
+.msg.me{flex-direction:row-reverse}
+.msg.me .bub{background:#241012;border-color:#3d0f0b}
+.msg .who{font-size:11px;font-weight:800;color:var(--green);margin-bottom:2px;letter-spacing:.3px}
+.msg .txt{font-size:14px;line-height:1.45;word-break:break-word}
+.msg .media{margin-top:6px;max-width:100%;max-height:320px;border-radius:8px;display:block;border:1px solid var(--line)}
+.msg .time{font-size:10px;color:var(--mut2);margin-top:4px;text-align:right}
+.reactrow{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+.react{font-size:11.5px;background:#232327;border:1px solid var(--line);border-radius:12px;padding:1px 8px;cursor:pointer;color:var(--mut);user-select:none}
+.react.on{border-color:var(--green);color:var(--txt);background:#38100d}
+.composer{display:flex;gap:8px;padding:10px;background:var(--panel);border:1px solid var(--line);border-top:0;border-radius:0 0 12px 12px;align-items:center;flex-wrap:wrap}
+.composer input[type=text]{flex:1;min-width:150px}
+.icobtn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px 11px;font-size:15px;cursor:pointer;line-height:1}
+.icobtn:hover{border-color:var(--green)}
+.icobtn.on{border-color:var(--green);background:#38100d}
+.mediaprev{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--panel);border:1px solid var(--line);border-top:0;font-size:12px;color:var(--mut)}
+.mediaprev img,.mediaprev video{max-height:64px;max-width:110px;border-radius:6px;border:1px solid var(--line)}
+.gifpanel{padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-top:0;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.gifpanel input[type=text]{flex:1;min-width:200px}
+@media(max-width:700px){.matchhead .mscore{font-size:26px} nav button{padding:12px 9px;font-size:12.5px} .msg .bub{max-width:88%} .chatwrap{height:calc(100vh - 340px)}}
+</style>
+</head>
+<body>
+<header><div class="hwrap">
+  <div class="logo"><span class="sv">SV</span>SAC<em>VERDE</em></div>
+  <nav id="nav"></nav>
+</div></header>
+<main id="app"></main>
+<script>
+window.onerror = function(msg, src, line, col){
+  var el = document.getElementById("app");
+  if (el) el.innerHTML = '<pre style="color:#fff;font-size:16px;padding:20px;white-space:pre-wrap">JS ERROR: '+msg+' @ '+line+':'+col+'</pre>';
+  return false;
+};
+let DATA = null;
+let DRAFT_DATA = null;
+const FINANCIALS = {
+ entry_fee: 205,
+ weekly_high_score: 50,
+ high_scores: [
+  {week:1, winner:"Roaring Hoogy"},
+  {week:2, winner:"Juggernauts"},
+  {week:3, winner:"Pool Boy"},
+  {week:4, winner:"Juggernauts"},
+  {week:5, winner:"K2's Kings"},
+  {week:6, winner:"Roaring Hoogy"},
+  {week:7, winner:"Roaring Hoogy"},
+  {week:8, winner:"K2's Kings"},
+  {week:9, winner:"Juggernauts"},
+  {week:10, winner:"Pool Boy"},
+  {week:11, winner:"Assassins"},
+  {week:12, winner:"Alligator Arms"},
+  {week:13, winner:"Assassins"},
+  {week:14, winner:"da bombers"}
+ ],
+ team_finances: [
+  {team:"K2's Kings", weekly:100, season:0, entry:-205, paid:105, totalWin:100},
+  {team:"3 Nuggles", weekly:0, season:0, entry:-205, paid:205, totalWin:0},
+  {team:"Roaring Hoogy", weekly:150, season:175, entry:-205, paid:-120, totalWin:325},
+  {team:"Assassins", weekly:100, season:0, entry:-205, paid:105, totalWin:100},
+  {team:"Juggernauts", weekly:150, season:525, entry:-205, paid:-470, totalWin:675},
+  {team:"Steel Curtain", weekly:0, season:50, entry:-205, paid:155, totalWin:50},
+  {team:"Tritons", weekly:0, season:50, entry:-205, paid:155, totalWin:50},
+  {team:"Rhin-Owned", weekly:0, season:0, entry:-205, paid:205, totalWin:0},
+  {team:"Milky Wet Hogs", weekly:0, season:0, entry:-205, paid:205, totalWin:0},
+  {team:"da bombers", weekly:50, season:0, entry:-205, paid:155, totalWin:50},
+  {team:"Alligator Arms", weekly:50, season:910, entry:-205, paid:-755, totalWin:960},
+  {team:"Pool Boy", weekly:100, season:50, entry:-205, paid:55, totalWin:150}
+ ],
+ payouts: [
+  {place:"1st", amount:910},
+  {place:"2nd", amount:525},
+  {place:"3rd", amount:175},
+  {place:"4th", amount:50},
+  {place:"5th", amount:50},
+  {place:"6th", amount:50}
+ ]
+};
+const CAP = 170;
+let TEAMS = [];
+const PLAYOFF_LABEL = {P1:"Wildcard", P2:"Semifinal", CHAMP:"Title / 3rd Place"};
+
+// ---------- helpers ----------
+const $ = s=>document.querySelector(s);
+const money = n=>"$"+(+n).toFixed(0);
+const clean = n=>String(n).replace(/^[xy]\s*-\s*/,"");
+const norm = s=>clean(s).toUpperCase().replace(/[^A-Z0-9]/g,"");
+const T = name=>{ const k=norm(name); return TEAMS.find(t=>norm(t)===k) || TEAMS.find(t=>norm(t).includes(k)||k.includes(norm(t))); };
+const rec = t=>{const r=DATA.teams[t].info.record||["-","-","-"];return r[0]+"-"+r[1]+(r[2]!=="0"&&r[2]?"-"+r[2]:"");};
+const minBid = sal=>Math.max(1,Math.ceil(sal/2));
+const esc = s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+const tgo = t=>`onclick="goTeam(decodeURIComponent('${encodeURIComponent(t)}'))"`;
+const POSORD = {QB:1,RB:2,WR:3,TE:4,K:5,DST:6,DEF:6};
+
+let state = {view:"home", team:"Roaring Hoogy", week:14, bidTeam:"Roaring Hoogy", bids:{}, bidTab:"place", histTab:"2025", search:"", posF:"ALL", live:null, draftYear:"2025", draftView:"board", draftTeamF:"ALL", salaryTeamF:"ALL", salaryPosF:"ALL", salarySort:"market", schedWeek:"ALL", schedTeamF:"ALL", schedTab:"weekly", finTab:"overview"};
+
+// ---------- nav ----------
+const VIEWS = [["home","League Home"],["teams","Teams"],["schedule","Schedule"],["draft","Draft"],["salary","Salary List"],["financials","Financials"],["bids","Bid Room"],["match","Matchup Center"],["forum","Forum"],["history","History"],["rules","Rules"],["office","Front Office"]];
+function nav(){ $("#nav").innerHTML = VIEWS.map(([k,l])=>`<button class="${state.view===k?'on':''}" onclick="go('${k}')">${l}</button>`).join(""); }
+function go(v){ state.view=v; if(state.live){clearInterval(state.live.timer); state.live=null;} render(); window.scrollTo(0,0); }
+function goTeam(t){ state.team=t; go("teams"); }
+
+// ---------- HOME ----------
+function vHome(){
+  const divs = DATA.divisions;
+  const weekOpts = Object.keys(DATA.weeks).map(w=>`<option ${+w===+state.week?"selected":""} value="${w}">Week ${w}</option>`).join("");
+  const games = DATA.weeks[state.week]||[];
+  // league leaders
+  const byPts = TEAMS.map(t=>({t,p:+DATA.teams[t].info.pf||0})).sort((a,b)=>b.p-a.p);
+  // biggest single-week score
+  let high={s:0}; Object.entries(DATA.weeks).forEach(([w,gs])=>gs.forEach(g=>{ if(g.hs>high.s)high={s:g.hs,t:g.home,w}; if(g.as>high.s)high={s:g.as,t:g.away,w}; }));
+  return `
+  <div class="hero">
+    <div class="champ"><span class="trophy">🏆</span><div>
+      <div class="sub">2025 SACVERDE CHAMPION</div>
+      <div class="name">Alligator Arms</div>
+      <div class="sm mut">def. Juggernauts 112.94 – 86.72 in the Championship</div>
+    </div></div>
+    <div class="grid g3" style="min-width:280px">
+      <div class="stat"><span class="lbl">Top Regular-Season Score</span><span class="big grn">${high.s.toFixed(2)}</span><span class="sm mut">${clean(high.t)} · Week ${high.w}</span></div>
+      <div class="stat"><span class="lbl">Most Points For</span><span class="big">${byPts[0].p.toFixed(0)}</span><span class="sm mut">${byPts[0].t}</span></div>
+    </div>
+  </div>
+
+  <h2>Standings <span class="sub">· 2025 Final · x = division winner, y = wildcard</span></h2>
+  <div class="grid g2">
+  ${Object.entries(divs).map(([d,ts])=>`
+    <div class="card"><h3>${d}</h3><table>
+    <tr><th></th><th>Team</th><th class="r">W</th><th class="r">L</th><th class="r">Div</th><th class="r">PF</th></tr>
+    ${ts.map(x=>{const nm=clean(x.team); const tag=x.team.startsWith("x")?'<span class="pill g">x</span>':x.team.startsWith("y")?'<span class="pill y">y</span>':"";
+      return `<tr><td>${x.rank}</td><td><a ${tgo(T(nm))}>${esc(nm)}</a> ${tag}</td><td class="r">${x.w}</td><td class="r">${x.l}</td><td class="r mut">${x.dw}-${x.dl}</td><td class="r">${x.pts.toFixed(2)}</td></tr>`;}).join("")}
+    </table></div>`).join("")}
+  </div>
+
+  <h2 class="spread">Scoreboard <select onchange="state.week=this.value;render()">${weekOpts}</select></h2>
+  <div class="grid g3">
+  ${games.map((g,i)=>{const hw=g.hs>g.as;return `
+    <div class="scorebox" onclick="openMatch('${state.week}',${i})">
+      <div><div class="t ${hw?'win':'lose'}">${esc(clean(g.home))}</div><div class="t ${hw?'lose':'win'}">${esc(clean(g.away))}</div></div>
+      <div style="text-align:right"><div class="s ${hw?'win':'lose'}">${g.hs.toFixed(2)}</div><div class="s ${hw?'lose':'win'}">${g.as.toFixed(2)}</div></div>
+    </div>`;}).join("")}
+  </div>
+  <div class="note">Click any game to open it in the Matchup Center with the live-scoring demo.</div>
+
+  <h2>Franchises</h2>
+  <div class="teamgrid">
+  ${TEAMS.map(t=>{const i=DATA.teams[t].info;return `<div class="tcard" ${tgo(t)}>
+    <div class="tn">${esc(t)}</div><div class="sm mut">${rec(t)} · ${i.standing||""} ${i.division?("· "+i.division):""}</div>
+    <div class="sm mut2">${(+i.pf||0).toFixed(0)} PF</div></div>`;}).join("")}
+  </div>`;
+}
+
+// ---------- TEAMS ----------
+function vTeams(){
+  const t = DATA.teams[state.team], i=t.info, h=t.history;
+  const capUsed = t.total_salary;
+  const sortRoster = [...t.roster].sort((a,b)=>(POSORD[a.pos]||9)-(POSORD[b.pos]||9)||b.salary-a.salary);
+  const rosterRows = r=>r.map(p=>`<tr><td><span class="pos ${p.pos}">${p.pos}</span></td><td>${esc(p.name)}${p.contract?`<span class="badge">${p.contract}yr</span>`:""}</td><td class="mut">${p.nfl}</td><td class="r">${money(p.salary)}</td></tr>`).join("");
+  return `
+  <div class="spread"><h1>${esc(state.team)}</h1>
+    <select onchange="state.team=this.value;render()">${TEAMS.map(x=>`<option ${x===state.team?"selected":""}>${esc(x)}</option>`).join("")}</select>
+  </div>
+  <div class="sub">${i.owners?("Manager: "+esc(i.owners)+" · "):""}${i.division||""} ${i.standing?("· Finished "+i.standing):""}</div>
+
+  <div class="grid g4" style="margin-top:16px">
+    <div class="card stat"><span class="lbl">2025 Record</span><span class="big">${rec(state.team)}</span><span class="sm mut">Division ${ (i.div_record||["-","-"]).slice(0,2).join("-") }</span></div>
+    <div class="card stat"><span class="lbl">Points For / Against</span><span class="big">${(+i.pf||0).toFixed(0)}</span><span class="sm mut">${(+i.pa||0).toFixed(0)} against · ${i.ppg||"-"} PPG</span></div>
+    <div class="card stat"><span class="lbl">Active Salary</span><span class="big">${money(capUsed)}</span>
+      <div class="bar" style="margin-top:6px"><i style="width:${Math.min(100,capUsed/CAP*100)}%"></i></div>
+      <span class="sm mut">${money(CAP-capUsed)} cap space · $${CAP} cap</span></div>
+    <div class="card stat"><span class="lbl">All-Time</span><span class="big">${h.all_time?h.all_time.slice(0,2).join("-"):"—"}</span><span class="sm mut">Postseason ${h.all_time_post?h.all_time_post.slice(0,2).join("-"):"—"}</span></div>
+  </div>
+
+  <div class="grid g2" style="margin-top:14px">
+    <div>
+      <div class="card"><h3>Active Roster · ${t.roster.length} players</h3>
+        <table><tr><th>Pos</th><th>Player</th><th>NFL</th><th class="r">Salary</th></tr>${rosterRows(sortRoster)}
+        <tr><td></td><td><b>Total</b></td><td></td><td class="r"><b>${money(capUsed)}</b></td></tr></table>
+      </div>
+      ${t.taxi.length?`<div class="card" style="margin-top:14px"><h3>Taxi Squad</h3><table>${rosterRows(t.taxi)}</table></div>`:""}
+      ${t.ir.length?`<div class="card" style="margin-top:14px"><h3>IR</h3><table>${rosterRows(t.ir)}</table></div>`:""}
+      <div class="card" style="margin-top:14px"><h3>Draft Picks</h3>
+        <div class="grid g2">${["2026","2027"].map(y=>`<div><div class="sub" style="margin-bottom:6px">${y}</div>${t.picks[y].map(p=>`<div class="sm" style="padding:3px 0">${esc(p)}</div>`).join("")||'<span class="mut2 sm">—</span>'}</div>`).join("")}</div>
+      </div>
+    </div>
+    <div>
+      <div class="card"><h3>2025 Schedule & Results</h3>
+        <table><tr><th>Wk</th><th>Opponent</th><th></th><th class="r">Score</th></tr>
+        ${t.schedule.map(s=>{const pl=PLAYOFF_LABEL[s.week];return `<tr>
+          <td>${pl?`<span class="pill b">${s.week}</span>`:s.week}</td>
+          <td>${esc(s.opp)}${pl?` <span class="sm mut2">${pl}</span>`:""}</td>
+          <td>${s.result?`<span class="pill ${s.result==="W"?"g":"r"}">${s.result}</span>`:""}</td>
+          <td class="r">${typeof s.pf==="number"?s.pf.toFixed(2)+" – "+(+s.pa).toFixed(2):'<span class="mut2">BYE</span>'}</td></tr>`;}).join("")}
+        </table>
+      </div>
+      <div class="card" style="margin-top:14px"><h3>Franchise Honors</h3>
+        ${h["League Champ"]?`<div class="sm" style="padding:3px 0">🏆 <b class="gold">League Champ:</b> ${h["League Champ"]}</div>`:""}
+        ${h["Division Champ"]?`<div class="sm" style="padding:3px 0">🚩 <b>Division Champ:</b> ${h["Division Champ"]}</div>`:""}
+        ${h["Playoff Appearances"]?`<div class="sm" style="padding:3px 0">🎟️ <b>Playoffs:</b> ${h["Playoff Appearances"]}</div>`:""}
+        ${h.all_time_gotw?`<div class="sm" style="padding:3px 0">⭐ <b>Game of the Week:</b> ${h.all_time_gotw.slice(0,2).join("-")}</div>`:""}
+      </div>
+      <div class="card" style="margin-top:14px"><h3>2025 Transaction Log · ${t.transactions.length}</h3>
+        <div style="max-height:340px;overflow:auto">${t.transactions.map(x=>`<div class="sm" style="padding:5px 0;border-bottom:1px solid #202024">${esc(x)}</div>`).join("")||'<span class="mut2 sm">No transactions</span>'}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ---------- BID ROOM ----------
+const REVEAL = [
+ {pos:"RB",player:"James Conner",winner:"K2's Kings",amt:15,others:[["da bombers",13],["Assassins",13],["Roaring Hoogy",13],["Juggernauts",13]]},
+ {pos:"RB",player:"Joe Mixon",winner:"da bombers",amt:15,others:[["Roaring Hoogy",15],["Juggernauts",15]]},
+ {pos:"RB",player:"Alvin Kamara",winner:"K2's Kings",amt:20,others:[["Assassins",3],["da bombers",13],["3 Nuggles",5]]},
+ {pos:"WR",player:"Jakobi Meyers",winner:"Pool Boy",amt:25,others:[["Tritons",15],["Roaring Hoogy",4],["K2's Kings",2]]},
+ {pos:"WR",player:"Cooper Kupp",winner:"Tritons",amt:17,others:[["da bombers",6],["Assassins",11],["Roaring Hoogy",6]]},
+ {pos:"WR",player:"Mike Evans",winner:"K2's Kings",amt:15,others:[["Arms",6],["da bombers",13],["Assassins",13],["Roaring Hoogy",13]]},
+ {pos:"QB",player:"Kyler Murray",winner:"K2's Kings",amt:11,others:[["Alligator Arms",11],["Tritons",10]]},
+ {pos:"QB",player:"Justin Fields",winner:"Tritons",amt:9,others:[["Milky Wet Hogs",5],["Steel Curtain",3]]},
+];
+function vBids(){
+  const owned = new Set(DATA.salary_list.filter(p=>p.owner).map(p=>p.name));
+  let fas = DATA.salary_list.filter(p=>!p.owner);
+  if(state.posF!=="ALL") fas = fas.filter(p=>p.pos===state.posF);
+  if(state.search) fas = fas.filter(p=>p.name.toLowerCase().includes(state.search.toLowerCase()));
+  fas = fas.sort((a,b)=>b.salary-a.salary).slice(0,40);
+  const myBids = Object.entries(state.bids);
+  const total = myBids.reduce((s,[,v])=>s+v.amt,0);
+  const capSpace = CAP - DATA.teams[state.bidTeam].total_salary;
+  return `
+  <h1>Tuesday Bid Room</h1>
+  <div class="sub">Sealed blind bidding — exactly like the sheet, minus the emails.</div>
+  <div class="tabs">
+    <button class="${state.bidTab==='place'?'on':''}" onclick="state.bidTab='place';render()">Place Bids 🔒</button>
+    <button class="${state.bidTab==='reveal'?'on':''}" onclick="state.bidTab='reveal';render()">Tuesday Reveal</button>
+    <button class="${state.bidTab==='rules'?'on':''}" onclick="state.bidTab='rules';render()">Process & Rules</button>
+  </div>
+  ${state.bidTab==='place'?`
+  <div class="note"><span class="lock">🔒 SEALED</span>&nbsp; Bids are stored privately per manager. Nobody — not even the commissioner — sees them until the Tuesday reveal. <i>(In this demo they just live on your screen.)</i></div>
+  <div class="spread" style="margin:12px 0">
+    <div class="flex">Bidding as:
+      <select onchange="state.bidTeam=this.value;state.bids={};render()">${TEAMS.map(x=>`<option ${x===state.bidTeam?"selected":""}>${esc(x)}</option>`).join("")}</select>
+    </div>
+    <div class="flex sm mut">Cap space: <b class="grn">${money(capSpace)}</b> · Committed to bids: <b class="${total>capSpace?'red':'gold'}">${money(total)}</b></div>
+  </div>
+  <div class="searchrow">
+    <input type="text" placeholder="Search free agents…" value="${esc(state.search)}" oninput="state.search=this.value;render();this.focus();this.setSelectionRange(this.value.length,this.value.length)">
+    <select onchange="state.posF=this.value;render()">${["ALL","QB","RB","WR","TE"].map(p=>`<option ${p===state.posF?"selected":""}>${p}</option>`).join("")}</select>
+  </div>
+  <div class="card"><h3>Free Agent Pool · top 40 shown of ${DATA.salary_list.filter(p=>!p.owner).length}</h3>
+  <table><tr><th>Pos</th><th>Player</th><th>NFL</th><th class="r">Salary</th><th class="r">Min Bid</th><th class="r">Your Bid</th><th></th></tr>
+  ${fas.map(p=>{const b=state.bids[p.name]; const mb=minBid(p.salary);
+    return `<tr><td><span class="pos ${p.pos}">${p.pos}</span></td><td>${esc(p.name)}${p.rookie?'<span class="badge">R</span>':""}</td><td class="mut">${p.nfl}</td>
+    <td class="r">${money(p.salary)}</td><td class="r mut">${money(mb)}</td>
+    <td class="r"><input type="number" min="0" value="${b?b.amt:""}" onchange="setBid('${esc(p.name).replace(/'/g,"\\'")}',this.value,${p.salary})"></td>
+    <td>${b?(b.amt<mb?'<span class="warn">BID TOO LOW</span>':'<span class="pill g">✓ sealed</span>'):""}</td></tr>`;}).join("")}
+  </table></div>
+  ${myBids.length?`<div class="card" style="margin-top:14px"><h3>Your Sealed Bids (${myBids.length})</h3>
+    <table>${myBids.map(([n,v])=>`<tr><td>${esc(n)}</td><td class="r">${money(v.amt)}</td><td>${v.amt<minBid(v.sal)?'<span class="warn">BID TOO LOW — min '+money(minBid(v.sal))+'</span>':'<span class="pill g">valid</span>'}</td></tr>`).join("")}</table>
+    <div style="margin-top:10px"><button class="btn">Submit sealed bids →</button> <span class="sm mut2">(demo)</span></div></div>`:""}
+  `:""}
+  ${state.bidTab==='reveal'?`
+  <div class="note">Every Tuesday at reveal time, all sealed bids flip public at once. Highest bid wins the player at that salary; ties go to worse standing. Sample below uses <b>real Week 14 bids from your 2025 sheet</b>.</div>
+  <div class="grid g2">
+  ${REVEAL.map(r=>`<div class="card">
+    <div class="spread"><div><span class="pos ${r.pos}">${r.pos}</span> <b>${r.player}</b></div><span class="pill g">WON: ${esc(r.winner)} · ${money(r.amt)}</span></div>
+    <table style="margin-top:8px">${r.others.map(([t,a])=>`<tr><td class="mut">${esc(t)}</td><td class="r mut">${money(a)}</td></tr>`).join("")}</table>
+  </div>`).join("")}
+  </div>`:""}
+  ${state.bidTab==='rules'?`
+  <div class="grid g2">
+    <div class="card"><h3>Sunday / MNF players</h3>
+      <div class="sm" style="line-height:2">
+      #1 winning bid → priority adds until <b>Friday 9a</b><br>
+      #2 winning bid → priority adds until <b>Saturday 9a</b><br>
+      #3 winning bid → priority adds until <b>Sunday 9a</b><br>
+      At Sunday 9a, any team that bid may add — first to claim wins.</div></div>
+    <div class="card"><h3>Thursday night players</h3>
+      <div class="sm" style="line-height:2">
+      #1 winning bid → priority adds until <b>Thursday 12p</b><br>
+      #2 winning bid → <b>12p – 4p Thursday</b><br>
+      At 4p Thursday, any team that bid may add — first to claim wins.</div></div>
+    <div class="card"><h3>Bid validity</h3>
+      <div class="sm" style="line-height:2">
+      Minimum bid = <b>half the player's salary</b>, rounded up.<br>
+      The site validates this <i>before</i> you submit — no more "BID TOO LOW" surprises on Tuesday.<br>
+      Winning bid becomes the player's new salary.</div></div>
+    <div class="card"><h3>What the site automates</h3>
+      <div class="sm" style="line-height:2">
+      ✅ Sealed bid storage per manager<br>
+      ✅ Simultaneous Tuesday reveal<br>
+      ✅ Tie-breaking &amp; priority-window timers<br>
+      ✅ Auto roster + cap updates on winning claims<br>
+      ✅ Full bid history archive</div></div>
+  </div>`:""}`;
+}
+function setBid(name, val, sal){
+  const v = parseInt(val,10);
+  if(!v || v<=0) delete state.bids[name]; else state.bids[name]={amt:v,sal};
+  render();
+}
+
+// ---------- MATCHUP CENTER ----------
+function openMatch(week,gi){ state.view="match"; state.week=week; state.gi=gi; startLive(); }
+function starters(team){
+  return [...DATA.teams[team].roster].sort((a,b)=>(POSORD[a.pos]||9)-(POSORD[b.pos]||9)||b.salary-a.salary);
+}
+function distribute(team, total){
+  // deterministic pseudo-random split of the real final score across the roster, weighted by salary
+  const rs = starters(team); let seed = team.length*7+total;
+  const rnd = ()=>{ seed=(seed*9301+49297)%233280; return seed/233280; };
+  const wts = rs.map(p=>Math.max(1,p.salary)*(0.6+rnd()*0.8));
+  const sum = wts.reduce((a,b)=>a+b,0);
+  return rs.map((p,i)=>({...p, pts:+(total*wts[i]/sum).toFixed(2)}));
+}
+function startLive(){
+  if(state.live) clearInterval(state.live.timer);
+  const g = (DATA.weeks[state.week]||[])[state.gi||0];
+  if(!g){state.live=null; render(); return;}
+  const home=T(g.home), away=T(g.away);
+  state.live = {g, home, away, hp:distribute(home,g.hs), ap:distribute(away,g.as), prog:0, done:false,
+    timer:setInterval(()=>{ state.live.prog=Math.min(1,state.live.prog+0.02);
+      if(state.live.prog>=1){state.live.done=true; clearInterval(state.live.timer);} renderLiveOnly(); },160)};
+  render();
+}
+function renderLiveOnly(){ const el=$("#livewrap"); if(el) el.innerHTML=liveHTML(); }
+function liveHTML(){
+  const L=state.live; if(!L) return "";
+  const f=L.prog, hs=(L.g.hs*f), as=(L.g.as*f);
+  const wp = hs+as>0 ? hs/(hs+as)*100 : 50;
+  const row=(p,i,side)=>{const pts=(p.pts*Math.min(1,f*1.15-(i*0.01))).toFixed(2);
+    return `<tr><td><span class="pos ${p.pos}">${p.pos}</span></td><td>${esc(p.name)}</td><td class="r"><b>${Math.max(0,pts)}</b></td></tr>`;};
+  return `
+  <div class="matchhead">
+    <div><div style="font-weight:800;font-size:17px">${esc(L.home)}</div><div class="sm mut">${rec(L.home)}</div><div class="mscore ${hs>=as?'win':''}">${hs.toFixed(2)}</div></div>
+    <div class="vs">${L.done?'FINAL':'<span class="live-dot"></span>LIVE'}<br>WK ${state.week}</div>
+    <div><div style="font-weight:800;font-size:17px">${esc(L.away)}</div><div class="sm mut">${rec(L.away)}</div><div class="mscore ${as>hs?'win':''}">${as.toFixed(2)}</div></div>
+  </div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="spread sm"><span>${esc(L.home)} win probability</span><b class="grn">${wp.toFixed(0)}%</b></div>
+    <div class="wp"><i style="width:${wp}%"></i></div>
+  </div>
+  <div class="grid g2">
+    <div class="card"><h3>${esc(L.home)}</h3><table>${L.hp.map((p,i)=>row(p,i)).join("")}</table></div>
+    <div class="card"><h3>${esc(L.away)}</h3><table>${L.ap.map((p,i)=>row(p,i)).join("")}</table></div>
+  </div>
+  <div class="ticker">${L.done? "Final. Point totals are the real Week "+state.week+" result — player splits are simulated for the demo." : "⚡ Live demo: replaying the real final score of this game as if you were watching Sunday…"}</div>`;
+}
+function vMatch(){
+  const weekOpts = Object.keys(DATA.weeks).map(w=>`<option ${+w===+state.week?"selected":""} value="${w}">Week ${w}</option>`).join("");
+  const games = DATA.weeks[state.week]||[];
+  if(!state.live && games.length) { setTimeout(()=>{state.gi=state.gi||0; startLive();},0); }
+  return `
+  <h1>Matchup Center</h1>
+  <div class="sub">Head-to-head with live scoring. Demo uses standard scoring (0.5 PPR-style placeholder) — we'll plug in the real SacVerde format next.</div>
+  <div class="flex" style="margin:14px 0">
+    <select onchange="state.week=this.value;state.gi=0;startLive()">${weekOpts}</select>
+    <div class="tabs" style="margin:0">
+    ${games.map((g,i)=>`<button class="${i===(state.gi||0)?'on':''}" onclick="state.gi=${i};startLive()">${esc(clean(g.home).split(' ')[0])} v ${esc(clean(g.away).split(' ')[0])}</button>`).join("")}
+    </div>
+    <button class="btn ghost sm" onclick="startLive()">↺ Replay live</button>
+  </div>
+  <div id="livewrap">${liveHTML()}</div>`;
+}
+
+// ---------- HISTORY ----------
+function vHistory(){
+  const champs = [];
+  TEAMS.forEach(t=>{const y=DATA.teams[t].history["League Champ"]; if(y) y.split(",").map(s=>s.trim()).filter(Boolean).forEach(yr=>champs.push([yr,t]));});
+  champs.sort((a,b)=>a[0].localeCompare(b[0]));
+  const byYear = {}; champs.forEach(([y,t])=>byYear[y]=t);
+  byYear["2025"] = "Alligator Arms";
+  const years = []; for(let y=2003;y<=2025;y++) years.push(String(y));
+  return `
+  <h1>League History</h1>
+  <div class="sub">The archive. 2025 is fully loaded from the sheets — past seasons get filled in as we dig up the old records.</div>
+  <div class="tabs">
+    <button class="${state.histTab==='2025'?'on':''}" onclick="state.histTab='2025';render()">2025 Season</button>
+    <button class="${state.histTab==='banners'?'on':''}" onclick="state.histTab='banners';render()">Championship Banners</button>
+    <button class="${state.histTab==='alltime'?'on':''}" onclick="state.histTab='alltime';render()">All-Time Records</button>
+  </div>
+  ${state.histTab==='2025'?`
+    <div class="hero"><div class="champ"><span class="trophy">🏆</span><div>
+      <div class="sub">2025 CHAMPION</div><div class="name">Alligator Arms</div>
+      <div class="sm mut">11-3 regular season · Gopher Nation champs · beat Juggernauts in the final</div></div></div></div>
+    <h2>Playoff Bracket</h2>
+    <div class="card" style="padding:24px;overflow-x:auto">
+    <div class="bracket" style="min-width:700px">
+      <div class="bracket-col">
+        <div class="rnd">Wildcard</div>
+        <div class="bslot" style="position:relative">
+          <div class="bgame"><div><span class="win">Roaring Hoogy</span><b class="win">159.94</b></div><div><span class="lose">Pool Boy</span><b class="lose">101.12</b></div></div>
+          <div class="bconn" style="top:25%;height:120%;border-top-right-radius:8px;border-bottom:none"></div>
+        </div>
+        <div class="bslot" style="position:relative">
+          <div class="bgame" style="border-style:dashed"><div><span class="gold">Juggernauts</span><b class="mut2">BYE</b></div></div>
+          <div class="bconn" style="bottom:25%;height:120%;border-bottom-right-radius:8px;border-top:none"></div>
+        </div>
+        <div style="height:24px"></div>
+        <div class="bslot" style="position:relative">
+          <div class="bgame" style="border-style:dashed"><div><span class="gold">Alligator Arms</span><b class="mut2">BYE</b></div></div>
+          <div class="bconn" style="top:25%;height:120%;border-top-right-radius:8px;border-bottom:none"></div>
+        </div>
+        <div class="bslot" style="position:relative">
+          <div class="bgame"><div><span class="win">Tritons</span><b class="win">138.40</b></div><div><span class="lose">Steel Curtain</span><b class="lose">127.12</b></div></div>
+          <div class="bconn" style="bottom:25%;height:120%;border-bottom-right-radius:8px;border-top:none"></div>
+        </div>
+      </div>
+      <div class="bracket-col">
+        <div class="rnd">Semifinals</div>
+        <div class="bslot" style="position:relative;margin-top:28px">
+          <div class="bgame"><div><span class="win">Juggernauts</span><b class="win">154.76</b></div><div><span class="lose">Roaring Hoogy</span><b class="lose">101.60</b></div></div>
+          <div class="bconn" style="top:10%;height:220%;border-top-right-radius:8px;border-bottom:none"></div>
+        </div>
+        <div style="height:48px"></div>
+        <div class="bslot" style="position:relative">
+          <div class="bgame"><div><span class="win">Alligator Arms</span><b class="win">113.20</b></div><div><span class="lose">Tritons</span><b class="lose">87.70</b></div></div>
+          <div class="bconn" style="bottom:10%;height:220%;border-bottom-right-radius:8px;border-top:none"></div>
+        </div>
+      </div>
+      <div class="bracket-col" style="justify-content:center">
+        <div class="rnd">Championship</div>
+        <div class="bslot">
+          <div class="bgame" style="border-color:var(--gold)"><div><span class="gold">🏆 Alligator Arms</span><b class="win">112.94</b></div><div><span class="lose">Juggernauts</span><b class="lose">86.72</b></div></div>
+        </div>
+        <div class="b3rd">
+          <div class="rnd">3rd Place</div>
+          <div class="bslot">
+            <div class="bgame"><div><span class="win">Roaring Hoogy</span><b class="win">117.30</b></div><div><span class="lose">Tritons</span><b class="lose">90.50</b></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    </div>
+    <h2>Final Standings</h2>
+    <div class="card"><table><tr><th>Team</th><th>Record</th><th class="r">PF</th><th class="r">PA</th><th class="r">PPG</th></tr>
+    ${TEAMS.map(t=>({t,i:DATA.teams[t].info})).sort((a,b)=>(+b.i.record[0])-(+a.i.record[0])||(+b.i.pf)-(+a.i.pf)).map(({t,i})=>
+      `<tr><td><a ${tgo(t)}>${esc(t)}</a>${t==="Alligator Arms"?" 🏆":""}</td><td>${rec(t)}</td><td class="r">${(+i.pf).toFixed(2)}</td><td class="r">${(+i.pa).toFixed(2)}</td><td class="r">${i.ppg}</td></tr>`).join("")}
+    </table></div>
+  `:""}
+  ${state.histTab==='banners'?`
+    <h2>Champions by Year</h2>
+    <div class="grid g4">
+    ${years.map(y=>`<div class="card" style="text-align:center;${byYear[y]?'border-color:#3d0f0b':''}">
+      <div class="sub">${y}</div>
+      ${byYear[y]?`<div style="font-size:15px;font-weight:800" class="gold">🏆 ${esc(byYear[y])}</div>`:`<div class="mut2 sm" style="padding:4px 0">to be added</div>`}
+    </div>`).join("")}
+    </div>
+    <div class="note">Champion years pulled from each team sheet's "Titles &amp; Records" — all 23 seasons accounted for. Next up for the archive: season-by-season standings, brackets, and results as we backfill from the old sheets.</div>
+  `:""}
+  ${state.histTab==='alltime'?`
+    <div class="card"><table>
+    <tr><th>Franchise</th><th class="r">All-Time W</th><th class="r">L</th><th class="r">Win %</th><th class="r">Playoffs W-L</th><th class="r">GOTW W-L</th><th class="r">Titles</th></tr>
+    ${TEAMS.map(t=>{const h=DATA.teams[t].history; const at=h.all_time||[]; const w=+at[0]||0,l=+at[1]||0;
+      const titles=(h["League Champ"]||"").split(",").filter(s=>s.trim()).length;
+      return {t,w,l,po:h.all_time_post,go:h.all_time_gotw,titles};}).sort((a,b)=>b.w/(b.w+b.l||1)-a.w/(a.w+a.l||1)).map(x=>
+      `<tr><td><a ${tgo(x.t)}>${esc(x.t)}</a></td><td class="r">${x.w||"—"}</td><td class="r">${x.l||"—"}</td>
+      <td class="r">${x.w?((x.w/(x.w+x.l))*100).toFixed(1)+"%":"—"}</td>
+      <td class="r">${x.po?x.po.slice(0,2).join("-"):"—"}</td><td class="r">${x.go?x.go.slice(0,2).join("-"):"—"}</td>
+      <td class="r">${x.titles?("🏆".repeat(Math.min(x.titles,5))):""}</td></tr>`).join("")}
+    </table></div>
+    <div class="note">All-time records come straight from the CUMULATIVE RECORDS block on each team sheet. Some sheets are missing them — easy to add.</div>
+  `:""}`;
+}
+
+// ---------- FRONT OFFICE ----------
+function vOffice(){
+  const rows = TEAMS.map(t=>({t, sal:DATA.teams[t].total_salary, taxi:DATA.teams[t].taxi_salary,
+    p26:DATA.teams[t].picks["2026"].length, p27:DATA.teams[t].picks["2027"].length,
+    tx:DATA.teams[t].transactions.length})).sort((a,b)=>b.sal-a.sal);
+  const maxSal = Math.max(...rows.map(r=>r.sal));
+  const allTx = [];
+  TEAMS.forEach(t=>DATA.teams[t].transactions.forEach(x=>allTx.push([t,x])));
+  return `
+  <h1>Front Office</h1>
+  <div class="sub">League-wide cap sheet, draft capital, and the full transaction wire — the commissioner view, visible to everyone.</div>
+  <h2>Salary Cap Landscape <span class="sub">· $${CAP} salary cap</span></h2>
+  <div class="card">
+    ${rows.map(r=>`<div class="spread" style="padding:6px 0">
+      <div style="width:130px" class="sm"><a ${tgo(r.t)}>${esc(r.t)}</a></div>
+      <div style="flex:1;min-width:150px" class="bar"><i style="width:${(r.sal/maxSal*100)}%"></i></div>
+      <div style="width:130px;text-align:right" class="sm"><b>${money(r.sal)}</b> <span class="mut2">· ${money(CAP-r.sal)} free</span></div>
+    </div>`).join("")}
+  </div>
+  <h2>Draft Capital & Activity</h2>
+  <div class="card"><table>
+    <tr><th>Team</th><th class="r">2026 Picks</th><th class="r">2027 Picks</th><th class="r">Taxi $</th><th class="r">2025 Transactions</th></tr>
+    ${rows.map(r=>`<tr><td><a ${tgo(r.t)}>${esc(r.t)}</a></td><td class="r">${r.p26}</td><td class="r">${r.p27}</td><td class="r">${money(r.taxi)}</td><td class="r">${r.tx}</td></tr>`).join("")}
+  </table></div>
+  <h2>Transaction Wire <span class="sub">· all 2025 moves, every team</span></h2>
+  <div class="card" style="max-height:420px;overflow:auto">
+    ${allTx.map(([t,x])=>`<div class="sm" style="padding:6px 0;border-bottom:1px solid #202024"><span class="pill b" style="margin-right:8px">${esc(t)}</span>${esc(x)}</div>`).join("")}
+  </div>
+  <h2>Coming with the real build</h2>
+  <div class="grid g3">
+    <div class="card"><h3>⚖️ Trade Machine</h3><div class="sm mut">Propose trades with players + picks, auto cap validation, league veto window, instant roster updates on approval.</div></div>
+    <div class="card"><h3>⏱️ Deadline Automation</h3><div class="sm mut">Bid windows open/close themselves. Priority-add timers run automatically with reminders texted/emailed to managers.</div></div>
+    <div class="card"><h3>📊 Contract & Keeper Tools</h3><div class="sm mut">Contract-year tracking (those (2)/(4F) tags), franchise tag windows, offseason salary escalators — all computed for you.</div></div>
+    <div class="card"><h3>🏈 Live Stats Feed</h3><div class="sm mut">Real-time player scoring in the Matchup Center, synced to the SacVerde scoring format.</div></div>
+    <div class="card"><h3>🗳️ League Votes</h3><div class="sm mut">Rule changes, vetoes, and GOTW picks handled with in-site polls instead of email chains.</div></div>
+    <div class="card"><h3>📱 Works everywhere</h3><div class="sm mut">Phone-first design. Managers get a login; commissioner gets admin tools. No more spreadsheet permissions.</div></div>
+  </div>`;
+}
+
+// ---------- FORUM ----------
+const FORUM_KEY = "sv_forum_v1";
+function initials(n){ return String(n).split(/\s+/).map(w=>w[0]).join("").slice(0,2).toUpperCase(); }
+function forumSeed(){
+  const now = Date.now();
+  return [
+   {id:1, who:"Juggernauts", txt:"Rematch in 2026. That championship was a fluke and everyone knows it 😤", ts:now-86400000*2, reacts:{"😂":["Pool Boy","Tritons"]}},
+   {id:2, who:"Alligator Arms", txt:"Scoreboard. 112.94 – 86.72. I'll wait.", ts:now-86400000*2+3600000, reacts:{"🔥":["Roaring Hoogy"]}},
+   {id:3, who:"Roaring Hoogy", txt:"Welcome to the new league forum 🎉 This replaces the email chains. You can post pics, GIFs, and video clips right in the thread — try the 📷 and GIF buttons below.", ts:now-3600000*5, reacts:{"👍":["Steel Curtain","Tritons","Pool Boy"]}}
+  ];
+}
+let FORUM = null;
+try { FORUM = JSON.parse(localStorage.getItem(FORUM_KEY)); } catch(e){}
+if(!Array.isArray(FORUM) || !FORUM.length) FORUM = forumSeed();
+let forumPending = null; // {type:'img'|'vid', src, name}
+function forumSave(){
+  try { localStorage.setItem(FORUM_KEY, JSON.stringify(FORUM)); return true; }
+  catch(e){ return false; }
+}
+function fmtTime(ts){
+  const d = new Date(ts);
+  return d.toLocaleDateString([], {month:"short", day:"numeric"}) + " · " + d.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+}
+function safeSrc(s){
+  s = String(s).trim();
+  if(!/^(https?:|data:image\/|data:video\/)/i.test(s)) return null;
+  return s.replace(/"/g,"&quot;");
+}
+function mediaHTML(m){
+  if(!m) return "";
+  const src = safeSrc(m.src); if(!src) return "";
+  if(m.type==="vid") return `<video class="media" controls preload="metadata" src="${src}"></video>`;
+  return `<img class="media" src="${src}" alt="" loading="lazy" onerror="this.style.display='none'">`;
+}
+function forumPickFile(input){
+  const f = input.files && input.files[0]; if(!f) return;
+  if(f.size > 25*1024*1024){ alert("Keep demo uploads under 25MB — the real build will handle full-size video."); input.value=""; return; }
+  const rd = new FileReader();
+  rd.onload = ()=>{ forumPending = {type: f.type.startsWith("video")?"vid":"img", src: rd.result, name: f.name}; render(); };
+  rd.readAsDataURL(f);
+  input.value = "";
+}
+function forumGifUrl(){
+  const el = $("#gifurl"); if(!el || !el.value.trim()) return;
+  const raw = el.value.trim();
+  if(!safeSrc(raw)){ alert("Paste a direct http(s) link to a GIF, image, or video."); return; }
+  forumPending = {type:/\.(mp4|webm|mov)(\?|$)/i.test(raw)?"vid":"img", src: raw, name:"linked GIF/media"};
+  state.gifOpen = false; render();
+}
+function forumSend(){
+  const el = $("#chatmsg"); const txt = el ? el.value.trim() : "";
+  if(!txt && !forumPending) return;
+  FORUM.push({id:Date.now(), who:state.forumAs, txt, media:forumPending, ts:Date.now(), reacts:{}});
+  forumPending = null; if(el) el.value = "";
+  state.forumNote = forumSave() ? "" : "That file is too big to save in the browser demo — it stays visible until refresh. The real build stores media on a server.";
+  render();
+}
+function forumReact(id, emo){
+  const m = FORUM.find(x=>x.id===id); if(!m) return;
+  m.reacts = m.reacts || {};
+  const arr = m.reacts[emo] = m.reacts[emo] || [];
+  const i = arr.indexOf(state.forumAs);
+  if(i>=0) arr.splice(i,1); else arr.push(state.forumAs);
+  if(!arr.length) delete m.reacts[emo];
+  forumSave(); render();
+}
+function forumClear(){
+  if(confirm("Reset the forum demo? This clears all messages in this browser.")){
+    FORUM = forumSeed(); forumPending = null; forumSave(); render();
+  }
+}
+function forumScroll(){ const el = $("#chatlog"); if(el) el.scrollTop = el.scrollHeight; }
+function vForum(){
+  state.forumAs = state.forumAs || state.team || TEAMS[0];
+  setTimeout(forumScroll, 0);
+  const EMO = ["👍","🔥","😂","💀"];
+  return `
+  <h1>League Forum</h1>
+  <div class="sub">The SacVerde group chat — trash talk, trade rumors, and highlights. Pictures, GIFs, and video drop right into the thread.</div>
+  ${state.forumNote?`<div class="note">${esc(state.forumNote)}</div>`:""}
+  <div class="chatwrap">
+    <div class="chatlog" id="chatlog">
+      ${FORUM.map(m=>`
+      <div class="msg ${m.who===state.forumAs?"me":""}">
+        <div class="av">${esc(initials(m.who))}</div>
+        <div class="bub">
+          <div class="who">${esc(m.who)}</div>
+          ${m.txt?`<div class="txt">${esc(m.txt)}</div>`:""}
+          ${mediaHTML(m.media)}
+          <div class="reactrow">
+            ${EMO.map(e=>{const a=(m.reacts||{})[e]||[]; return `<span class="react ${a.includes(state.forumAs)?"on":""}" title="${esc(a.join(", "))}" onclick="forumReact(${m.id},'${e}')">${e}${a.length?" "+a.length:""}</span>`;}).join("")}
+          </div>
+          <div class="time">${fmtTime(m.ts)}</div>
+        </div>
+      </div>`).join("")}
+    </div>
+    ${forumPending?`<div class="mediaprev">
+      ${forumPending.type==="vid"?`<video src="${safeSrc(forumPending.src)}" muted></video>`:`<img src="${safeSrc(forumPending.src)}">`}
+      <span>Attached: <b>${esc(forumPending.name||"media")}</b></span>
+      <button class="btn ghost sm" onclick="forumPending=null;render()">✕ remove</button>
+    </div>`:""}
+    ${state.gifOpen?`<div class="gifpanel">
+      <span class="sm mut">Paste a GIF link — on GIPHY/Tenor, right-click the GIF → Copy image address. Direct .mp4/.webm links work too.</span>
+      <input type="text" id="gifurl" placeholder="https://media.giphy.com/media/…/giphy.gif" onkeydown="if(event.key==='Enter')forumGifUrl()">
+      <button class="btn sm" onclick="forumGifUrl()">Attach</button>
+    </div>`:""}
+    <div class="composer">
+      <select onchange="state.forumAs=this.value;render()" title="Posting as">${TEAMS.map(t=>`<option ${t===state.forumAs?"selected":""}>${esc(t)}</option>`).join("")}</select>
+      <button class="icobtn" title="Attach photo or video" onclick="document.getElementById('chatfile').click()">📷</button>
+      <button class="icobtn ${state.gifOpen?"on":""}" title="Attach a GIF" onclick="state.gifOpen=!state.gifOpen;render()">GIF</button>
+      <input type="file" id="chatfile" accept="image/*,video/*" style="display:none" onchange="forumPickFile(this)">
+      <input type="text" id="chatmsg" placeholder="Message the league…" onkeydown="if(event.key==='Enter')forumSend()">
+      <button class="btn" onclick="forumSend()">Send</button>
+    </div>
+  </div>
+  <div class="flex" style="margin-top:10px;justify-content:space-between">
+    <span class="sm mut2">Demo: messages save in this browser only. The real build syncs the chat league-wide with logins + notifications.</span>
+    <button class="btn ghost sm" onclick="forumClear()">Reset demo chat</button>
+  </div>`;
+}
+
+// ---------- SCHEDULE ----------
+function vSchedule(){
+  const weeks = Object.keys(DATA.weeks).sort((a,b)=>+a - +b);
+  const weekOpts = [`<option value="ALL" ${state.schedWeek==="ALL"?"selected":""}>All Weeks</option>`,...weeks.map(w=>`<option ${state.schedWeek===w?"selected":""} value="${w}">Week ${w}</option>`)].join("");
+  const teamOpts = [`<option value="ALL" ${state.schedTeamF==="ALL"?"selected":""}>All Teams</option>`,...TEAMS.sort().map(t=>`<option ${state.schedTeamF===t?"selected":""}>${t}</option>`)].join("");
+  const tabBtns = [["weekly","Weekly View"],["team","Team Schedule"],["playoff","Playoff Bracket"]].map(([k,l])=>
+    `<button class="${state.schedTab===k?'on':''}" onclick="state.schedTab='${k}';render()">${l}</button>`).join("");
+
+  let body = "";
+
+  if(state.schedTab==="weekly"){
+    // --- WEEKLY VIEW ---
+    const showWeeks = state.schedWeek==="ALL" ? weeks : [state.schedWeek];
+    body = showWeeks.map(w=>{
+      let games = DATA.weeks[w]||[];
+      if(state.schedTeamF!=="ALL") games = games.filter(g=>clean(g.home)===state.schedTeamF||clean(g.away)===state.schedTeamF);
+      if(!games.length) return "";
+
+      // Find game of the week: highest combined score
+      let gotwIdx = 0, gotwScore = 0;
+      games.forEach((g,i)=>{const tot=g.hs+g.as; if(tot>gotwScore){gotwScore=tot;gotwIdx=i;}});
+
+      // Bye detection: teams not scheduled this week
+      const scheduled = new Set();
+      (DATA.weeks[w]||[]).forEach(g=>{scheduled.add(clean(g.home));scheduled.add(clean(g.away));});
+      const byes = TEAMS.filter(t=>!scheduled.has(t));
+
+      // Weekly high scorer
+      const allScores = (DATA.weeks[w]||[]).flatMap(g=>[{team:clean(g.home),pts:g.hs},{team:clean(g.away),pts:g.as}]);
+      allScores.sort((a,b)=>b.pts-a.pts);
+      const topScorer = allScores[0];
+
+      return `<div class="card" style="margin-bottom:14px">
+        <div class="spread" style="margin-bottom:10px">
+          <h3 style="margin:0">Week ${w}</h3>
+          <div class="flex" style="gap:12px">
+            ${topScorer?`<span class="sm mut">High Score: <b class="grn">${topScorer.pts.toFixed(2)}</b> (${topScorer.team})</span>`:""}
+            ${byes.length?`<span class="sm mut">Bye: ${byes.join(", ")}</span>`:""}
+          </div>
+        </div>
+        <div class="grid g2">
+        ${games.map((g,i)=>{
+          const hw=g.hs>g.as, aw=g.as>g.hs;
+          const isGotw = i===gotwIdx && games.length>1;
+          return `<div class="scorebox" style="position:relative;${isGotw?'border-color:var(--green);background:#1d1315;':''}" onclick="openMatch(${w},${(DATA.weeks[w]||[]).indexOf(g)})">
+            ${isGotw?'<div style="position:absolute;top:-8px;right:12px"><span class="lock" style="font-size:10px">GAME OF THE WEEK</span></div>':''}
+            <div style="position:relative;flex:1;display:flex;justify-content:space-between;align-items:center">
+              <div><div class="t ${hw?'win':'lose'}">${clean(g.home)}</div><div class="sm mut">Home</div></div>
+              <div style="text-align:center"><div class="s">${g.hs.toFixed(2)} - ${g.as.toFixed(2)}</div></div>
+              <div style="text-align:right"><div class="t ${aw?'win':'lose'}">${clean(g.away)}</div><div class="sm mut">Away</div></div>
+            </div>
+          </div>`;
+        }).join("")}
+        </div>
+      </div>`;
+    }).join("");
+
+  } else if(state.schedTab==="team"){
+    // --- TEAM SCHEDULE VIEW ---
+    const teams = state.schedTeamF==="ALL" ? TEAMS.sort() : [state.schedTeamF];
+    body = teams.map(tm=>{
+      const t = DATA.teams[tm];
+      if(!t||!t.schedule) return "";
+      const sched = t.schedule;
+      const regSeason = sched.filter(s=>!isNaN(+s.week));
+      const playoffs = sched.filter(s=>isNaN(+s.week));
+      const wins = regSeason.filter(s=>s.result==="W").length;
+      const losses = regSeason.filter(s=>s.result==="L").length;
+      const ties = regSeason.filter(s=>s.result==="T").length;
+      const pf = regSeason.reduce((s,g)=>s+(+g.pf||0),0);
+
+      return `<div class="card" style="margin-bottom:14px">
+        <div class="spread">
+          <h3 style="margin:0"><a ${tgo(tm)}>${tm}</a></h3>
+          <div class="flex" style="gap:12px">
+            <span class="pill g">${wins}-${losses}${ties?"-"+ties:""}</span>
+            <span class="sm mut">PF: ${pf.toFixed(2)}</span>
+          </div>
+        </div>
+        <table style="margin-top:8px">
+          <tr><th style="width:60px">Week</th><th>Opponent</th><th style="width:50px">W/L</th><th class="r">PF</th><th class="r">PA</th><th class="r">Margin</th></tr>
+          ${sched.map(s=>{
+            const pl=PLAYOFF_LABEL[s.week];
+            const isBye = s.opp==="BYE";
+            const margin = s.pf&&s.pa ? ((+s.pf)-(+s.pa)).toFixed(2) : "";
+            const mCls = margin ? (+margin>0?'grn':+margin<0?'red':'mut') : '';
+            return `<tr${pl?' style="background:var(--panel2)"':''}>
+              <td>${pl||"Wk "+s.week}</td>
+              <td>${isBye?'<span class="mut2">BYE</span>':(T(s.opp)?`<a ${tgo(T(s.opp))}>${s.opp}</a>`:s.opp)}</td>
+              <td><span class="${s.result==='W'?'grn':s.result==='L'?'red':'mut'}">${s.result||"—"}</span></td>
+              <td class="r">${s.pf||"—"}</td>
+              <td class="r">${s.pa||"—"}</td>
+              <td class="r"><span class="${mCls}">${margin?(+margin>0?"+":"")+margin:"—"}</span></td>
+            </tr>`;
+          }).join("")}
+        </table>
+      </div>`;
+    }).join("");
+
+  } else if(state.schedTab==="playoff"){
+    // --- PLAYOFF BRACKET ---
+    // Build from team schedules - find P1, P2, CHAMP results
+    const playoffTeams = {};
+    TEAMS.forEach(tm=>{
+      const sched = DATA.teams[tm].schedule||[];
+      sched.filter(s=>isNaN(+s.week)).forEach(s=>{
+        if(!playoffTeams[tm]) playoffTeams[tm] = {};
+        playoffTeams[tm][s.week] = {opp:s.opp, result:s.result, pf:s.pf, pa:s.pa};
+      });
+    });
+
+    // Determine playoff participants and seeds from standings
+    const standings = TEAMS.map(t=>({t, w:+DATA.teams[t].info.record[0], l:+DATA.teams[t].info.record[1], pf:+DATA.teams[t].info.pf}))
+      .sort((a,b)=>b.w-a.w || b.pf-a.pf);
+
+    // Who had a BYE in P1 = top seeds
+    const byeTeams = TEAMS.filter(tm=>playoffTeams[tm]&&playoffTeams[tm].P1&&playoffTeams[tm].P1.opp==="BYE");
+    const wcTeams = TEAMS.filter(tm=>playoffTeams[tm]&&playoffTeams[tm].P1&&playoffTeams[tm].P1.opp!=="BYE");
+
+    // Build wildcard matchups
+    const wcGames = [];
+    const wcDone = new Set();
+    wcTeams.forEach(tm=>{
+      if(wcDone.has(tm)) return;
+      const p1 = playoffTeams[tm].P1;
+      const oppName = T(p1.opp);
+      if(oppName) wcDone.add(oppName);
+      wcDone.add(tm);
+      wcGames.push({
+        t1:tm, s1:p1.pf, r1:p1.result,
+        t2:oppName||p1.opp, s2:p1.pa, r2:p1.result==="W"?"L":"W"
+      });
+    });
+
+    // Build semifinal matchups
+    const sfGames = [];
+    const sfDone = new Set();
+    TEAMS.forEach(tm=>{
+      if(sfDone.has(tm)) return;
+      if(!playoffTeams[tm]||!playoffTeams[tm].P2||playoffTeams[tm].P2.opp==="BYE") return;
+      const p2 = playoffTeams[tm].P2;
+      const oppName = T(p2.opp);
+      if(oppName) sfDone.add(oppName);
+      sfDone.add(tm);
+      sfGames.push({
+        t1:tm, s1:p2.pf, r1:p2.result,
+        t2:oppName||p2.opp, s2:p2.pa, r2:p2.result==="W"?"L":"W"
+      });
+    });
+
+    // Build championship + 3rd place
+    const champGames = [];
+    const champDone = new Set();
+    TEAMS.forEach(tm=>{
+      if(champDone.has(tm)) return;
+      if(!playoffTeams[tm]||!playoffTeams[tm].CHAMP) return;
+      const ch = playoffTeams[tm].CHAMP;
+      const oppName = T(ch.opp);
+      if(oppName) champDone.add(oppName);
+      champDone.add(tm);
+      champGames.push({
+        t1:tm, s1:ch.pf, r1:ch.result,
+        t2:oppName||ch.opp, s2:ch.pa, r2:ch.result==="W"?"L":"W"
+      });
+    });
+
+    const gameBox = (g, highlight)=>`<div class="bgame"${highlight?' style="border-color:var(--gold)"':''}>
+      <div><span${g.r1==="W"?(highlight?" class=\"gold\"":' class="win"'):' class="lose"'}>${g.r1==="W"&&highlight?"🏆 ":""}${g.t1}</span><b class="${g.r1==="W"?'win':'lose'}">${g.s1||"—"}</b></div>
+      <div><span${g.r2==="W"?(highlight?" class=\"gold\"":' class="win"'):' class="lose"'}>${g.r2==="W"&&highlight?"🏆 ":""}${g.t2}</span><b class="${g.r2==="W"?'win':'lose'}">${g.s2||"—"}</b></div>
+    </div>`;
+
+    const byeBox = (t,seed)=>`<div class="bgame" style="border-style:dashed">
+      <div><span class="gold">${t}</span><b class="mut2">BYE</b></div>
+    </div>`;
+
+    // Current playoff outlook - seed list
+    const seedList = standings.slice(0,6).map((s,i)=>
+      `<tr><td style="text-align:center">${i+1}</td><td><a ${tgo(s.t)}>${s.t}</a>${i<2?' <span class="lock" style="font-size:9px">BYE</span>':''}</td><td class="r">${s.w}-${s.l}</td><td class="r">${s.pf.toFixed(2)}</td></tr>`).join("");
+    const bubbleList = standings.slice(6,9).map((s,i)=>
+      `<tr><td style="text-align:center;color:var(--mut2)">${i+7}</td><td class="mut">${s.t}</td><td class="r mut">${s.w}-${s.l}</td><td class="r mut">${s.pf.toFixed(2)}</td></tr>`).join("");
+
+    body = `
+    <div class="card" style="margin-bottom:18px;padding:24px;overflow-x:auto">
+      <h3 style="text-align:center;margin-bottom:18px;font-size:14px;letter-spacing:2px">PLAYOFF BRACKET</h3>
+      <div class="bracket" style="min-width:700px">
+        <div class="bracket-col">
+          <div class="rnd">Wildcard</div>
+          <div class="bslot" style="position:relative">
+            ${wcGames[0]?gameBox(wcGames[0],false):'<div class="bgame mut2">TBD</div>'}
+            <div class="bconn" style="top:25%;height:120%;border-top-right-radius:8px;border-bottom:none"></div>
+          </div>
+          <div class="bslot" style="position:relative">
+            ${byeTeams[1]?byeBox(byeTeams[1]):'<div class="bgame mut2">TBD</div>'}
+            <div class="bconn" style="bottom:25%;height:120%;border-bottom-right-radius:8px;border-top:none"></div>
+          </div>
+          <div style="height:24px"></div>
+          <div class="bslot" style="position:relative">
+            ${byeTeams[0]?byeBox(byeTeams[0]):'<div class="bgame mut2">TBD</div>'}
+            <div class="bconn" style="top:25%;height:120%;border-top-right-radius:8px;border-bottom:none"></div>
+          </div>
+          <div class="bslot" style="position:relative">
+            ${wcGames[1]?gameBox(wcGames[1],false):(wcGames.length<2?'<div class="bgame mut2">TBD</div>':'')}
+            <div class="bconn" style="bottom:25%;height:120%;border-bottom-right-radius:8px;border-top:none"></div>
+          </div>
+        </div>
+        <div class="bracket-col">
+          <div class="rnd">Semifinals</div>
+          <div class="bslot" style="position:relative;margin-top:28px">
+            ${sfGames[0]?gameBox(sfGames[0],false):'<div class="bgame mut2">TBD</div>'}
+            <div class="bconn" style="top:10%;height:220%;border-top-right-radius:8px;border-bottom:none"></div>
+          </div>
+          <div style="height:48px"></div>
+          <div class="bslot" style="position:relative">
+            ${sfGames[1]?gameBox(sfGames[1],false):(sfGames.length<2?'<div class="bgame mut2">TBD</div>':'')}
+            <div class="bconn" style="bottom:10%;height:220%;border-bottom-right-radius:8px;border-top:none"></div>
+          </div>
+        </div>
+        <div class="bracket-col" style="justify-content:center">
+          <div class="rnd">Championship</div>
+          <div class="bslot">
+            ${champGames.length?gameBox(champGames[0],true):'<div class="bgame mut2">TBD</div>'}
+          </div>
+          ${champGames.length>1?`<div class="b3rd">
+            <div class="rnd">3rd Place</div>
+            <div class="bslot">${gameBox(champGames[1],false)}</div>
+          </div>`:''}
+        </div>
+      </div>
+    </div>
+
+    <div class="grid g2" style="margin-bottom:18px">
+      <div class="card">
+        <h3>Playoff Seeds</h3>
+        <table><tr><th style="width:40px">Seed</th><th>Team</th><th class="r">Record</th><th class="r">PF</th></tr>
+        ${seedList}
+        <tr><td colspan="4" style="padding:6px 8px;color:var(--mut2);font-size:11px;text-transform:uppercase;letter-spacing:1px">Bubble</td></tr>
+        ${bubbleList}
+        </table>
+      </div>
+      <div class="card">
+        <h3>Playoff Format</h3>
+        <div style="padding:8px 0;font-size:13.5px;color:var(--mut)">
+          <div style="margin-bottom:8px"><b class="gold">6 teams</b> qualify for the postseason</div>
+          <div style="margin-bottom:8px"><b>Seeds 1-2:</b> First-round BYE (division champs)</div>
+          <div style="margin-bottom:8px"><b>Seeds 3-6:</b> Wildcard round</div>
+          <div style="margin-bottom:8px"><b>Semifinals → Championship + 3rd Place game</b></div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  return `<h1>Schedule</h1>
+  <div class="tabs" style="margin-bottom:4px">${tabBtns}</div>
+  ${state.schedTab!=="playoff"?`<div class="flex" style="margin:14px 0;gap:10px">
+    <select onchange="state.schedWeek=this.value;render()">${weekOpts}</select>
+    <select onchange="state.schedTeamF=this.value;render()">${teamOpts}</select>
+  </div>`:''}
+  ${body}`;
+}
+
+// ---------- FINANCIALS ----------
+function vFinancials(){
+  const tabBtns = [["overview","Overview"],["weekly","Weekly High Scores"],["teams","Team Breakdown"],["payouts","Payouts"]].map(([k,l])=>
+    `<button class="${state.finTab===k?'on':''}" onclick="state.finTab='${k}';render()">${l}</button>`).join("");
+
+  let body = "";
+  const F = FINANCIALS;
+  const totalPot = F.entry_fee * TEAMS.length;
+  const weeklyPaid = F.high_scores.length * F.weekly_high_score;
+  const seasonPaid = F.payouts.reduce((s,p)=>s+p.amount,0);
+
+  if(state.finTab==="overview"){
+    // --- OVERVIEW ---
+    // High score winners leaderboard
+    const hsCount = {};
+    F.high_scores.forEach(h=>{hsCount[h.winner]=(hsCount[h.winner]||0)+1});
+    const hsLeader = Object.entries(hsCount).sort((a,b)=>b[1]-a[1]);
+
+    body = `
+    <div class="grid g3" style="margin-bottom:18px">
+      <div class="card stat"><span class="lbl">Total League Pot</span><span class="big">${money(totalPot)}</span><span class="sm mut">${TEAMS.length} teams × ${money(F.entry_fee)}</span></div>
+      <div class="card stat"><span class="lbl">Weekly Payouts</span><span class="big">${money(weeklyPaid)}</span><span class="sm mut">${F.high_scores.length} weeks × ${money(F.weekly_high_score)}</span></div>
+      <div class="card stat"><span class="lbl">Season Prizes</span><span class="big">${money(seasonPaid)}</span><span class="sm mut">Top 6 finishers</span></div>
+    </div>
+    <div class="grid g2">
+      <div class="card">
+        <h3>Weekly High Score Leaders</h3>
+        <table><tr><th>Team</th><th class="r">Wins</th><th class="r">Earnings</th></tr>
+        ${hsLeader.map(([t,ct])=>`<tr><td><a ${tgo(t)}>${t}</a></td><td class="r">${ct}</td><td class="r grn">${money(ct*F.weekly_high_score)}</td></tr>`).join("")}
+        </table>
+      </div>
+      <div class="card">
+        <h3>Weekly High Scores</h3>
+        <table><tr><th>Week</th><th>Winner</th><th class="r">Score</th><th class="r">Payout</th></tr>
+        ${F.high_scores.map(h=>{
+          const games = DATA.weeks[h.week]||[];
+          const scores = games.flatMap(g=>[{team:clean(g.home),pts:g.hs},{team:clean(g.away),pts:g.as}]);
+          scores.sort((a,b)=>b.pts-a.pts);
+          const top = scores[0];
+          return `<tr><td>Week ${h.week}</td><td><a ${tgo(h.winner)}>${h.winner}</a></td>
+          <td class="r">${top?top.pts.toFixed(2):"—"}</td><td class="r grn">${money(F.weekly_high_score)}</td></tr>`;
+        }).join("")}
+        </table>
+      </div>
+    </div>`;
+
+  } else if(state.finTab==="weekly"){
+    // --- WEEKLY HIGH SCORES ---
+    // For each week, find the actual top scorer from DATA.weeks
+    const weekRows = F.high_scores.map(h=>{
+      const games = DATA.weeks[h.week]||[];
+      const scores = games.flatMap(g=>[{team:clean(g.home),pts:g.hs},{team:clean(g.away),pts:g.as}]);
+      scores.sort((a,b)=>b.pts-a.pts);
+      const top = scores[0];
+      return `<tr>
+        <td>Week ${h.week}</td>
+        <td><a ${tgo(h.winner)}>${h.winner}</a></td>
+        <td class="r">${top?top.pts.toFixed(2):"—"}</td>
+        <td class="r grn">${money(F.weekly_high_score)}</td>
+      </tr>`;
+    }).join("");
+
+    body = `<div class="card">
+      <table>
+        <tr><th>Week</th><th>Winner</th><th class="r">Score</th><th class="r">Payout</th></tr>
+        ${weekRows}
+        <tr style="border-top:2px solid var(--line)"><td></td><td><b>Total</b></td><td></td><td class="r"><b class="grn">${money(weeklyPaid)}</b></td></tr>
+      </table>
+    </div>`;
+
+  } else if(state.finTab==="teams"){
+    // --- TEAM BREAKDOWN ---
+    const rows = F.team_finances.slice().sort((a,b)=>b.totalWin-a.totalWin).map(t=>{
+      const net = t.totalWin - F.entry_fee;
+      const barW = t.totalWin>0 ? Math.min(100, t.totalWin / 960 * 100) : 0;
+      return `<tr>
+        <td><a ${tgo(t.team)}>${t.team}</a></td>
+        <td class="r">${money(F.entry_fee)}</td>
+        <td class="r">${t.weekly?money(t.weekly):'<span class="mut2">$0</span>'}</td>
+        <td class="r">${t.season?money(t.season):'<span class="mut2">$0</span>'}</td>
+        <td class="r grn">${money(t.totalWin)}</td>
+        <td class="r ${net>=0?'grn':'red'}">${net>=0?'+':''}${money(net)}</td>
+        <td style="width:80px"><div class="bar"><i style="width:${barW}%"></i></div></td>
+      </tr>`;
+    }).join("");
+
+    body = `<div class="card">
+      <table>
+        <tr><th>Team</th><th class="r">Entry</th><th class="r">Weekly $</th><th class="r">Season $</th><th class="r">Total Won</th><th class="r">Net P/L</th><th></th></tr>
+        ${rows}
+      </table>
+    </div>`;
+
+  } else if(state.finTab==="payouts"){
+    // --- PAYOUTS ---
+    const medals = ["🥇","🥈","🥉","","",""];
+    body = `<div class="grid g2">
+      <div class="card">
+        <h3>Season Finish Payouts</h3>
+        <table><tr><th>Place</th><th class="r">Payout</th><th class="r">% of Pot</th></tr>
+        ${F.payouts.map((p,i)=>`<tr>
+          <td>${medals[i]||""} ${p.place}</td>
+          <td class="r grn">${money(p.amount)}</td>
+          <td class="r mut">${(p.amount/totalPot*100).toFixed(1)}%</td>
+        </tr>`).join("")}
+        <tr style="border-top:2px solid var(--line)"><td><b>Total Season</b></td><td class="r"><b>${money(seasonPaid)}</b></td><td class="r mut">${(seasonPaid/totalPot*100).toFixed(1)}%</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>Pot Breakdown</h3>
+        <div class="stat" style="gap:12px;padding:10px 0">
+          <div class="spread"><span>Total Pot</span><span class="big">${money(totalPot)}</span></div>
+          <div class="bar" style="height:14px"><i style="width:${(seasonPaid/totalPot*100)}%;background:var(--green)"></i></div>
+          <div class="spread"><span class="sm mut">Season Prizes</span><span class="sm">${money(seasonPaid)}</span></div>
+          <div class="spread"><span class="sm mut">Weekly High Scores (${F.high_scores.length} wks)</span><span class="sm">${money(weeklyPaid)}</span></div>
+          <div class="spread" style="border-top:1px solid var(--line);padding-top:8px;margin-top:4px"><span class="sm mut"><b>Distributed</b></span><span class="sm"><b>${money(seasonPaid+weeklyPaid)}</b></span></div>
+          <div class="spread"><span class="sm mut">Remaining in Pot</span><span class="sm gold"><b>${money(totalPot-seasonPaid-weeklyPaid)}</b></span></div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  return `<h1>Financials</h1>
+  <div class="sub" style="margin-bottom:14px">League finances, weekly high scores, and payout breakdown.</div>
+  <div class="tabs">${tabBtns}</div>
+  ${body}`;
+}
+
+// ---------- DRAFT ----------
+function vDraft(){
+  const years = Object.keys(DRAFT_DATA).sort((a,b)=>b-a);
+  const d = DRAFT_DATA[state.draftYear];
+  if(!d) return `<h1>Draft</h1><p class="mut">No draft data available for ${state.draftYear}.</p>`;
+
+  const yearSel = years.map(y=>`<option ${y===state.draftYear?"selected":""} value="${y}">${y} Draft</option>`).join("");
+  const teamSet = new Set();
+  d.rounds.forEach(r=>r.picks.forEach(p=>{if(p.team)teamSet.add(p.team)}));
+  const teamList = [...teamSet].sort();
+  const teamOpts = [`<option value="ALL">All Teams</option>`,...teamList.map(t=>`<option ${state.draftTeamF===t?"selected":""}>${t}</option>`)].join("");
+
+  // View toggle
+  const viewBtns = [["board","Draft Board"],["team","By Team"]].map(([k,l])=>
+    `<button class="tabs ${state.draftView===k?'btn':'btn ghost'} sm" onclick="state.draftView='${k}';render()">${l}</button>`).join("");
+
+  let body = "";
+  if(state.draftView==="board"){
+    // True draft board grid: columns = pick slots, rows = rounds
+    const rounds = d.rounds.filter(r=>r.picks.some(p=>p.player));
+    const numPicks = Math.max(...d.rounds.map(r=>r.picks.length));
+    // Column headers: use pick slot number
+    const colHeaders = [];
+    for(let i=1;i<=numPicks;i++) colHeaders.push(i);
+
+    const headerRow = `<tr><th>RD</th>${colHeaders.map(c=>`<th>${c}</th>`).join("")}</tr>`;
+    const bodyRows = rounds.map((r,ri)=>{
+      const cells = colHeaders.map(c=>{
+        const p = r.picks.find(pk=>pk.pick===c);
+        if(!p) return `<td><div class="dcell empty">—</div></td>`;
+        const isHl = state.draftTeamF!=="ALL" && p.team===state.draftTeamF;
+        if(!p.player) return `<td><div class="dcell empty"><div class="dp-meta">${p.team}</div><div class="dp-name">—</div></div></td>`;
+        const tAbbr = p.team.length>10 ? p.team.substring(0,9)+'…' : p.team;
+        return `<td><div class="dcell${isHl?' hl':''} pos-${p.pos}" title="${r.round}.${String(c).padStart(2,'0')} — ${p.team}">
+          <div class="dp-pick">${tAbbr}</div>
+          <div class="dp-name">${p.player}</div>
+          <div class="dp-meta"><span class="pos ${p.pos}" style="font-size:8px;padding:0 3px">${p.pos}</span> ${p.nfl}</div>
+        </div></td>`;
+      }).join("");
+      return `<tr class="${ri%2?'even':''}""><td>${r.round}</td>${cells}</tr>`;
+    }).join("");
+
+    body = `<div class="dboard"><table>${headerRow}${bodyRows}</table></div>`;
+  } else {
+    // By-team view
+    const teams = state.draftTeamF==="ALL" ? teamList : [state.draftTeamF];
+    body = teams.map(tm=>{
+      const picks = [];
+      d.rounds.forEach(r=>r.picks.forEach(p=>{if(p.team===tm && p.player) picks.push({...p, round:r.round})}));
+      if(!picks.length) return "";
+      return `<div class="card" style="margin-bottom:14px">
+        <h3><a ${tgo(tm)}>${tm}</a> <span class="mut">(${picks.length} picks)</span></h3>
+        <table><tr><th style="width:50px">Pick</th><th>Player</th><th>Pos</th><th>NFL</th></tr>
+        ${picks.map(p=>`<tr class="byteam-${p.pos}">
+          <td>${p.round}.${String(p.pick).padStart(2,'0')}</td>
+          <td>${p.player}</td>
+          <td><span class="pos ${p.pos}">${p.pos}</span></td>
+          <td class="mut">${p.nfl}</td>
+        </tr>`).join("")}
+        </table></div>`;
+    }).join("");
+  }
+
+  // Draft summary stats
+  const allPicks = [];
+  d.rounds.forEach(r=>r.picks.forEach(p=>{if(p.player) allPicks.push(p)}));
+  const posCounts = {};
+  allPicks.forEach(p=>{posCounts[p.pos]=(posCounts[p.pos]||0)+1});
+  const statCards = Object.entries(posCounts).sort((a,b)=>b[1]-a[1]).map(([pos,ct])=>
+    `<div class="card stat"><span class="pos ${pos}">${pos}</span><span class="big">${ct}</span></div>`).join("");
+
+  return `<h1>Draft Results</h1>
+  <div class="flex" style="margin:14px 0;gap:10px">
+    <select onchange="state.draftYear=this.value;render()">${yearSel}</select>
+    <select onchange="state.draftTeamF=this.value;render()">${teamOpts}</select>
+    ${viewBtns}
+  </div>
+  <div class="grid g4" style="margin-bottom:18px">${statCards}</div>
+  ${body}`;
+}
+
+// ---------- SALARY LIST ----------
+function vSalary(){
+  // Build lookup: player name -> salary_list market price
+  const marketMap = {};
+  DATA.salary_list.forEach(p=>{ marketMap[p.name] = {salary:p.salary, pos:p.pos, nfl:p.nfl}; });
+
+  // Collect all owned players with both prices
+  const rows = [];
+  const ownedNames = new Set();
+  TEAMS.forEach(tm=>{
+    const t = DATA.teams[tm];
+    t.roster.forEach(p=>{
+      ownedNames.add(p.name);
+      const market = marketMap[p.name];
+      rows.push({
+        name: p.name, pos: p.pos, nfl: p.nfl, team: tm,
+        rosterSalary: p.salary, marketSalary: market ? market.salary : null,
+        diff: market ? p.salary - market.salary : null, type: 'roster'
+      });
+    });
+    t.taxi.forEach(p=>{
+      ownedNames.add(p.name);
+      rows.push({
+        name: p.name, pos: p.pos, nfl: p.nfl, team: tm,
+        rosterSalary: p.salary, marketSalary: null, diff: null, type: 'taxi'
+      });
+    });
+    t.ir.forEach(p=>{
+      ownedNames.add(p.name);
+      rows.push({
+        name: p.name, pos: p.pos, nfl: p.nfl, team: tm,
+        rosterSalary: p.salary, marketSalary: null, diff: null, type: 'ir',
+        irCapRelief: Math.floor(p.salary / 2)
+      });
+    });
+  });
+
+  // Add free agents (players on salary list with no owner)
+  DATA.salary_list.forEach(p=>{
+    if(!p.owner){
+      rows.push({
+        name: p.name, pos: p.pos, nfl: p.nfl, team: 'FA',
+        rosterSalary: p.salary, marketSalary: p.salary,
+        diff: 0, type: 'fa'
+      });
+    }
+  });
+
+  // Filter
+  let filtered = rows;
+  if(state.salaryTeamF==="FA") filtered = filtered.filter(r=>r.team==='FA');
+  else if(state.salaryTeamF!=="ALL") filtered = filtered.filter(r=>r.team===state.salaryTeamF);
+  if(state.salaryPosF!=="ALL") filtered = filtered.filter(r=>r.pos===state.salaryPosF);
+
+  // Sort
+  if(state.salarySort==="market") filtered.sort((a,b)=>(b.marketSalary||0)-(a.marketSalary||0));
+  else if(state.salarySort==="roster") filtered.sort((a,b)=>b.rosterSalary-a.rosterSalary);
+  else if(state.salarySort==="diff") filtered.sort((a,b)=>(a.diff||0)-(b.diff||0));
+  else if(state.salarySort==="name") filtered.sort((a,b)=>a.name.localeCompare(b.name));
+
+  const teamOpts = [`<option value="ALL">All Teams</option>`,`<option value="FA" ${state.salaryTeamF==="FA"?"selected":""}>Free Agents</option>`,...TEAMS.sort().map(t=>`<option ${state.salaryTeamF===t?"selected":""}>${t}</option>`)].join("");
+  const positions = [...new Set(rows.map(r=>r.pos))].sort((a,b)=>(POSORD[a]||99)-(POSORD[b]||99));
+  const posOpts = [`<option value="ALL">All Positions</option>`,...positions.map(p=>`<option ${state.salaryPosF===p?"selected":""}>${p}</option>`)].join("");
+  const sortOpts = [["market","Market Value"],["roster","Roster Salary"],["diff","Savings (Best Deals)"],["name","Name"]].map(([k,l])=>
+    `<option ${state.salarySort===k?"selected":""} value="${k}">${l}</option>`).join("");
+
+  // Cap summary per team
+  const capSummary = {};
+  TEAMS.forEach(tm=>{
+    const t = DATA.teams[tm];
+    const rosterCap = t.total_salary;
+    const irRelief = t.ir.reduce((s,p)=>s+Math.floor(p.salary/2),0);
+    capSummary[tm] = {rosterCap, irRelief, effectiveCap: rosterCap - irRelief, space: CAP - rosterCap + irRelief};
+  });
+
+  // Summary stats for the filtered view
+  const rosterOnly = filtered.filter(r=>r.type==='roster');
+  const totalRoster = rosterOnly.reduce((s,r)=>s+r.rosterSalary,0);
+  const totalMarket = rosterOnly.reduce((s,r)=>s+(r.marketSalary||0),0);
+  const totalSavings = totalMarket - totalRoster;
+
+  // Free agent count
+  const faCount = rows.filter(r=>r.type==='fa').length;
+
+  // Team-specific cap view
+  const showTeamCap = state.salaryTeamF !== "ALL" && state.salaryTeamF !== "FA";
+  const showFA = state.salaryTeamF === "FA";
+  const teamCapHTML = showFA ? (()=>{
+    const faRows = filtered.filter(r=>r.type==='fa');
+    const posCounts = {};
+    faRows.forEach(r=>{ posCounts[r.pos] = (posCounts[r.pos]||0)+1; });
+    return `
+    <div class="grid g4" style="margin-bottom:18px">
+      <div class="card stat"><span class="lbl">Free Agents</span><span class="big">${faRows.length}</span>
+        <span class="sm mut">available players</span></div>
+      ${['QB','RB','WR','TE','K','DST'].filter(p=>posCounts[p]).map(p=>
+        `<div class="card stat"><span class="lbl">${p}</span><span class="big">${posCounts[p]}</span></div>`
+      ).join('')}
+    </div>
+    <div class="note" style="margin-bottom:14px"><b>Bidding:</b> Min bid = half of listed salary, rounded to nearest dollar. Bids due <b>Tuesday 9pm</b>. Highest bid wins; ties go to worse standing. See the <b>Bid Room</b> tab to place bids.</div>`;
+  })() : showTeamCap ? (()=>{
+    const cs = capSummary[state.salaryTeamF];
+    const t = DATA.teams[state.salaryTeamF];
+    const irPlayers = t.ir;
+    const taxiPlayers = t.taxi;
+    return `
+    <div class="grid g4" style="margin-bottom:18px">
+      <div class="card stat"><span class="lbl">Roster Salary</span><span class="big">${money(cs.rosterCap)}</span>
+        <div class="bar" style="margin-top:6px"><i style="width:${Math.min(100,cs.rosterCap/CAP*100)}%"></i></div>
+        <span class="sm mut">of $${CAP} cap</span></div>
+      <div class="card stat"><span class="lbl">IR Cap Relief</span><span class="big grn">${irPlayers.length ? '+'+money(cs.irRelief) : '$0'}</span>
+        <span class="sm mut">${irPlayers.length} of 2 IR slots used</span></div>
+      <div class="card stat"><span class="lbl">Effective Cap Hit</span><span class="big">${money(cs.rosterCap - cs.irRelief)}</span>
+        <span class="sm mut">${money(cs.space)} cap space</span></div>
+      <div class="card stat"><span class="lbl">Taxi Squad</span><span class="big">${taxiPlayers.length}/4</span>
+        <span class="sm mut">$${taxiPlayers.reduce((s,p)=>s+p.salary,0)} (off-cap)</span></div>
+    </div>
+    ${irPlayers.length?`<div class="note" style="margin-bottom:14px"><b>IR Cap Rule:</b> Each IR player frees up <b>half their salary</b> in cap room. ${irPlayers.map(p=>`${p.name} ($${p.salary} salary → $${Math.floor(p.salary/2)} relief)`).join(', ')}. Min 3 weeks on IR. Players on IR at playoff start are ineligible. Max 2 IR slots.</div>`:''}
+    ${taxiPlayers.length?`<div class="note" style="margin-bottom:14px"><b>Taxi Squad:</b> Rookies only, max 4. Salary does <b>not</b> count against the $${CAP} cap until promoted to the 15-man roster. Once promoted, a player cannot be demoted back.</div>`:''}`;
+  })() : `
+    <div class="grid g4" style="margin-bottom:18px">
+      <div class="card stat"><span class="lbl">Rostered Players</span><span class="big">${rows.filter(r=>r.type!=='fa').length}</span></div>
+      <div class="card stat"><span class="lbl">Free Agents</span><span class="big">${faCount}</span>
+        <span class="sm mut"><a style="cursor:pointer" onclick="state.salaryTeamF='FA';render()">View all →</a></span></div>
+      <div class="card stat"><span class="lbl">Total Market Value</span><span class="big">${money(totalMarket)}</span></div>
+      <div class="card stat"><span class="lbl">Total Savings</span><span class="big ${totalSavings>0?'grn':'red'}">${totalSavings>0?'+':''}${money(totalSavings)}</span></div>
+    </div>`;
+
+  const tbl = filtered.map(r=>{
+    const diffVal = r.diff!==null ? r.diff : 0;
+    const diffCls = diffVal < 0 ? 'grn' : diffVal > 0 ? 'red' : 'mut';
+    const diffStr = r.marketSalary!==null ? `<span class="${diffCls}">${diffVal>0?'+':''}${money(diffVal)}</span>` : '<span class="mut2">—</span>';
+    const typeTag = r.type==='taxi' ? '<span class="badge" style="background:#1b5e20">TAXI</span>' :
+                    r.type==='ir' ? '<span class="badge" style="background:#c62828">IR</span>' :
+                    r.type==='fa' ? '<span class="badge" style="background:#555">FA</span>' : '';
+    const capNote = r.type==='ir' ? `<span class="sm grn" style="margin-left:6px">+${money(r.irCapRelief)} relief</span>` :
+                    r.type==='taxi' ? '<span class="sm mut2" style="margin-left:6px">off-cap</span>' : '';
+    const teamCell = r.team==='FA' ? '<span class="mut2">Free Agent</span>' : `<a ${tgo(r.team)}>${r.team}</a>`;
+    return `<tr>
+      <td><span class="pos ${r.pos}">${r.pos}</span></td>
+      <td>${r.name} ${typeTag}</td>
+      <td class="mut">${r.nfl}</td>
+      <td>${teamCell}</td>
+      <td class="r">${money(r.rosterSalary)}${capNote}</td>
+      <td class="r">${r.marketSalary!==null?money(r.marketSalary):'<span class="mut2">—</span>'}</td>
+      <td class="r">${diffStr}</td>
+      <td class="r mut">${(r.type==='roster'||r.type==='fa')?money(minBid(r.rosterSalary)):'—'}</td>
+    </tr>`;
+  }).join("");
+
+  return `<h1>Salary List</h1>
+  <div class="sub" style="margin-bottom:6px">$${CAP} salary cap · 15-man roster · Taxi squad off-cap · IR frees half salary</div>
+  <div class="note" style="margin-bottom:14px">
+    <b>Salary Cap Rules:</b> Each team's 15-man active roster must stay under <b>$${CAP}</b>. Taxi squad salaries (rookies only, max 4) do <b>not</b> count against the cap.
+    When a player is placed on IR, the owner gets <b>half that player's salary</b> back as cap room (max 2 IR slots, min 3 weeks on IR).
+    Free agent minimum bid = <b>half of listed salary</b>, rounded to nearest dollar.
+  </div>
+  <div class="flex" style="margin-bottom:14px;gap:10px">
+    <select onchange="state.salaryTeamF=this.value;render()">${teamOpts}</select>
+    <select onchange="state.salaryPosF=this.value;render()">${posOpts}</select>
+    <select onchange="state.salarySort=this.value;render()">${sortOpts}</select>
+  </div>
+  ${teamCapHTML}
+  <div class="card">
+    <table>
+      <tr><th>Pos</th><th>Player</th><th>NFL</th><th>Team</th><th class="r">Salary</th><th class="r">Market $</th><th class="r">Diff</th><th class="r">Min Bid</th></tr>
+      ${tbl}
+      <tr style="border-top:2px solid var(--line)"><td></td><td><b>Total (${filtered.length} players)</b></td><td></td><td></td><td class="r"><b>${money(totalRoster)}</b></td><td class="r"><b>${money(totalMarket)}</b></td><td class="r"><b class="${totalSavings>0?'grn':'red'}">${totalSavings>0?'+':''}${money(totalSavings)}</b></td><td></td></tr>
+    </table>
+  </div>`;
+}
+
+// ---------- RULES ----------
+function vRules(){
+  return `
+  <h1>League Rules</h1>
+  <div class="sub" style="margin-bottom:18px">Official SacVerde Fantasy Football League Constitution · Est. 2003 · 22nd Season</div>
+
+  <div class="tabs" id="ruleTabs">
+    <button class="on" onclick="ruleTab(this,'rAll')">All Rules</button>
+    <button onclick="ruleTab(this,'rGeneral')">General</button>
+    <button onclick="ruleTab(this,'rDraft')">Draft</button>
+    <button onclick="ruleTab(this,'rRoster')">Roster</button>
+    <button onclick="ruleTab(this,'rFA')">Free Agency</button>
+    <button onclick="ruleTab(this,'rTrading')">Trading</button>
+    <button onclick="ruleTab(this,'rScoring')">Scoring</button>
+    <button onclick="ruleTab(this,'rPlayoffs')">Playoffs</button>
+    <button onclick="ruleTab(this,'rKeepers')">Keepers</button>
+    <button onclick="ruleTab(this,'rChanges')">Rule Changes</button>
+  </div>
+
+  <div class="rsec" id="rGeneral">
+  <div class="card" style="margin-bottom:14px">
+    <h3>I. General Rules</h3>
+    <table>
+      <tr><td style="width:30px;vertical-align:top;color:var(--mut2)">A.</td><td>The league will consist of 12 teams in three divisions with four teams each.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">B.</td><td>This is the twenty-second year of the keeper league.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">C.</td><td>Teams will select players in an email draft beginning <b>August 11, 2025</b> at 8:00 AM PST when keeper lists are due. Draft can begin early if all lists are received prior to August 11th. Each team must consist of <b>15 players</b>. Each team will start the following each week:
+        <div style="margin:8px 0 8px 16px">
+          1 — Quarterback<br>
+          2 — Wide Receivers<br>
+          2 — Running Backs<br>
+          1 — Tight End<br>
+          1 — FLEX (RB/WR/TE)<br>
+          1 — Kicker<br>
+          1 — Defensive/Special Team Unit
+        </div>
+      </td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">D.</td><td>Owners are allowed to keep up to <b>6 players</b> from the previous year's squad, assuming they meet the eligibility requirements defined below.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">E.</td><td>The entire squad payroll must be under the <b class="grn">$170 salary cap</b>.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">F.</td><td>Each team plays <b>14 head-to-head games</b>. Each divisional opponent will be played twice and each non-divisional opponent will be played once (divisions remain the same year to year). The winner is the team who accumulates the most points for the week.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">G.</td><td>Four division winners and two wildcard teams advance to the Playoffs.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">H.</td><td>Trades and free agent pickups are not restricted in number. Trades are subject to the commissioner's approval.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">I.</td><td>Only one team per participant.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">J.</td><td>The entry fee is <b>$205</b>. <i>This must be paid in full by the end of the season.</i></td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">K.</td><td>The computer application/statistics fee is N/A for this season.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">L.</td><td>Award money:
+        <div style="margin:8px 0 0 16px">
+          Consolation game winner — <b>$175</b><br>
+          Finalist loser — <b>$525</b><br>
+          Champion — <b>$910</b><br>
+          3 other playoff qualifiers — <b>$50 each</b><br>
+          Weekly high score — <b>$50/week</b>
+        </div>
+      </td></tr>
+    </table>
+  </div>
+  </div>
+
+  <div class="rsec" id="rDraft">
+  <div class="card" style="margin-bottom:14px">
+    <h3>II. Draft</h3>
+    <div style="margin-bottom:12px"><b>A. Weekly Squad</b></div>
+    <table>
+      <tr><td style="width:30px;vertical-align:top;color:var(--mut2)">1.</td><td>Each player will be assigned a salary. While these figures will be based on highly respected periodicals, they will be adjusted to fit the salary cap structure. This figure will remain the same throughout the entire season (see free agent section).</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">2.</td><td>Players can only play their position according to their 2025 NFL positions.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">3.</td><td>The draft order will be in the reverse order of finish for the previous season with the 1st 6 selections of the round being determined by random lottery.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">4.</td><td>The draft's first round begins with the 1st pick – 12th pick. The 2nd round begins with the manager who picked last in the 1st round and ends with the selection by the manager who selected 1st in round one. The 1–12, 12–1 selection process rotates each round.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">5.</td><td>The draft is composed of <b>9 regular rounds</b>. With additional rounds as needed for teams needing to fill taxi or roster spots.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">6.</td><td>The sum of the salary of the fifteen players cannot exceed the <b>$170 salary cap</b>.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">7.</td><td>Any selection that violates the previous rule will not be permitted.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">8.</td><td>The defensive/special team unit is a member of the 15-man squad.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">9.</td><td>Picks in the first round will be allowed <b>5 minutes</b>, picks in each subsequent round will be allowed <b>3 minutes</b>. If your time expires with no pick, teams picking behind you may make their selection. <b>THIS TIME LIMIT WILL BE STRICTLY ENFORCED!</b> (for live draft only)</td></tr>
+    </table>
+    <div class="note" style="margin-top:12px">💡 <i>Helpful Hint: Pay attention to the players' Bye Weeks. Draft accordingly!</i></div>
+    <div style="margin:16px 0 12px"><b>B. Rookie/Taxi Squad</b></div>
+    <table>
+      <tr><td style="width:30px;vertical-align:top;color:var(--mut2)">1.</td><td>The rookie/taxi squad is composed of <b>four members, max</b>.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">2.</td><td>Only rookies can be drafted/added to the taxi squad.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">3.</td><td>These players are protected from free agency and waivers as long as they are not promoted to the 15-man squad.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">4.</td><td>Any players that are not promoted to the 15-man roster remain on the taxi squad for the following fantasy football season.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">5.</td><td>Any player that is promoted to the 15-man roster <b>cannot be demoted</b> to the taxi squad. They must be released or kept as part of the 6-man keeper list.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">6.</td><td>The salary of the taxi player <b>does not count towards the team's salary cap</b> (the salary affects the cap only when the player is promoted to the 15-man roster).</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">7.</td><td>If the taxi player remains on an owner's taxi squad then his salary will remain the same for the next season. His 3-year availability will not start until he is promoted to the weekly active squad (if the player is promoted at any time in the season, the player will lose 1 year of their availability).</td></tr>
+    </table>
+    <div style="margin:16px 0 12px"><b>C. Injured Reserved</b></div>
+    <table>
+      <tr><td style="width:30px;vertical-align:top;color:var(--mut2)">1.</td><td>A player may be placed on the IR when they are injured.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">2.</td><td>A player placed on the IR must remain on the list for a <b>minimum of 3 weeks</b>.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">3.</td><td>A player may pick up a free agent to fill the voided roster spot, but the owner has only <b>half of the injured player's salary added to his salary cap room</b>.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">4.</td><td>Any player on the IR at the start of playoffs is <b>not eligible</b> to play during the playoffs.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">5.</td><td>A player may not be placed on IR prior to owner submitting their keeper squad.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">6.</td><td>There is a limit of <b>2 IR players per team</b>.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">7.</td><td>All players must be on an NFL roster to be eligible for IR.</td></tr>
+    </table>
+  </div>
+  </div>
+
+  <div class="rsec" id="rRoster">
+  <div class="card" style="margin-bottom:14px">
+    <h3>III. Divisions</h3>
+    <table>
+      <tr><td style="width:30px;vertical-align:top;color:var(--mut2)">A.</td><td>Divisions will remain the same from year to year.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">B.</td><td>There will be four divisions.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">C.</td><td>Each division will consist of three teams.</td></tr>
+    </table>
+  </div>
+  <div class="card" style="margin-bottom:14px">
+    <h3>IV. Schedules</h3>
+    <table>
+      <tr><td style="width:30px;vertical-align:top;color:var(--mut2)">A.</td><td>A <b>14 game</b> regular season schedule will be played.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">B.</td><td>Teams will play divisional rivals twice.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">C.</td><td>Teams will play 9 non-divisional games.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">D.</td><td>The 14th game will be random draw for opponent.</td></tr>
+    </table>
+  </div>
+  <div class="card" style="margin-bottom:14px">
+    <h3>VII. Starting Line-Ups</h3>
+    <table>
+      <tr><td style="width:30px;vertical-align:top;color:var(--mut2)">A.</td><td>Starting line-ups <b>must</b> be submitted (by email or on Yahoo) each Sunday before the first kick-off.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">B.</td><td>A Thursday Night game is the start of the week. Owners must lock players that play on Thursday night prior to kickoff of that game. The remaining lineup must be locked prior to kickoff on Sunday.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">C.</td><td>If a line-up is not given prior to the first kickoff, the prior week's starting line-up will be used.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">D.</td><td>The line-up must meet the guidelines as outlined in Section I.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">E.</td><td>It is the responsibility of the manager to confirm his line-up for the week.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">F.</td><td><b>The Fighting Dogos Rule:</b> Every team must submit a valid lineup consisting of 1 QB, 2 RB's, 2 WR's, 1 WR/RB/TE, 1 TE, 1 K &amp; 1 DST each week.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">G.</td><td><b>Assass Your Roster Rule:</b> Players will be able to be inserted into the starting lineup as long as their team's game has not kicked off. Once a player in a starting lineup has had their game kick off, he may not be substituted out.</td></tr>
+    </table>
+  </div>
+  </div>
+
+  <div class="rsec" id="rFA">
+  <div class="card" style="margin-bottom:14px">
+    <h3>V. Free Agents</h3>
+    <table>
+      <tr><td style="width:30px;vertical-align:top;color:var(--mut2)">A.</td><td>Any players that are not selected will be free agents.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">B.</td><td>The owner must submit a request to sign the player by offering no less than the <b>minimum bid</b> which is equal to <b>one half of the player's listed salary rounded to the nearest whole dollar amount</b> (i.e., if a player has a listed salary of $5.00, his minimum bid will be $3.00). There is no maximum bid amount.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">C.</td><td>If two people make a request to sign the player, the manager with the highest bid will acquire the free agent. If two or more owners bid the same amount, then the <b>owner that is lower in the standings</b> for that week will be awarded the player.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">D.</td><td><b>9:00 p.m. Tuesday night</b> is the last night to submit a request for a player for the upcoming week.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">E.</td><td><b>While We're Young Rule</b> — This rule shortens the amount of time teams with higher priority have to add their FA:
+        <div style="margin:8px 0 0 16px">
+          <b>A.</b> Teams who win bids have until <b>Friday at 9am PST</b> to make adds. On Friday at 9am PST, the 2nd priority team may freely add players. On Saturday at 9am PST, the 3rd priority team may freely make adds. At 9am PST Sunday, any team who bid on a player not added may add said player, first come first serve through Yahoo.<br><br>
+          <b>B.</b> For TNF, teams who win bids have until <b>12pm Thursday</b> to make adds. 2nd priority may freely make adds for TNF players from 12pm–4pm on Thursday. All teams who bid on a TNF player may freely add said player from 4pm Thursday until kickoff, first come first serve through Yahoo.
+        </div>
+      </td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">G.</td><td><b>Let Free Agency Ring:</b> Bids can be made on a player in consecutive weeks.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">H.</td><td>Players that are acquired can start the following week.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">I.</td><td>The manager must make adjustments to maintain the mandatory <b>15-man roster and $170 salary cap</b>.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">J.</td><td>Any player dropped during the week becomes a free agent for the following week.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">K.</td><td>Any player that is cut <b>must</b> be reported to the commissioner.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">L.</td><td>It is the responsibility of the owner to contact the commissioner to confirm if they have acquired the free agent and to make any adjustments.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">M.</td><td>Players drafted to the taxi squad and then cut or put on the IR by their NFL team prior to kickoff on the 1st Sunday can be replaced with other taxi squad eligible players.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">N.</td><td>Players drafted to the taxi squad and subsequently moved to the regular 15-man roster during the season can be replaced by a taxi squad eligible free agent through the free agent bidding process.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">O.</td><td><b>Pair of Juggs Roster Rule:</b> Newly acquired free agents may not be traded until the week after they are acquired.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">P.</td><td><b><i>The free agent deadline is kickoff of the final week of NFL bye weeks.</i></b></td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">Q.</td><td>A player may not be added or dropped during the league week once their game has kicked off.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">R.</td><td><b>EXECUTIVE ORDER:</b> A player added during FA may not be dropped until the next league week.</td></tr>
+    </table>
+    <div class="note" style="margin-top:12px">💡 <i>Helpful Hint: Make adjustments as playoffs draw near.</i></div>
+  </div>
+  </div>
+
+  <div class="rsec" id="rTrading">
+  <div class="card" style="margin-bottom:14px">
+    <h3>VI. Trading</h3>
+    <table>
+      <tr><td style="width:30px;vertical-align:top;color:var(--mut2)">A.</td><td>Teams who desire to trade a player may submit a request to the commissioner.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">B.</td><td>Trades are final once the commissioner approves them.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">C.</td><td>The commissioner's decision is final.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">D.</td><td>If a trade makes a team surpass the salary cap the owner must rework his roster to have the mandatory 15-man roster fit the cap by the beginning of the next week's games or the trade is disapproved.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">E.</td><td>Owners may trade during the off-season; however, the commissioner must still approve.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">F.</td><td><b><i>The trading deadline is kickoff of week 11.</i></b></td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">G.</td><td><b>Testa Brothers Rule</b> — Trades that switch players to fill a need for the forthcoming week will not be allowed. Trades must have a legitimate interest to benefit each team. Trades cannot fill a need, due to not having the proper amount of players, to complete the starting lineup.</td></tr>
+    </table>
+  </div>
+  </div>
+
+  <div class="rsec" id="rScoring">
+  <div class="card" style="margin-bottom:14px">
+    <h3>IX. Scoring</h3>
+    <table>
+      <tr><td style="width:30px;vertical-align:top;color:var(--mut2)">A.</td><td>All statistics will be based upon an on-line database source (Yahoo).</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">B.</td><td>The team with the best regular season record in each of the playoff games in the first two rounds will receive the <b>home field bonus points</b> (reward for a good regular season).</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">D.</td><td><b>Defensive Dogos Rule:</b> Defensive scoring based on yards allowed.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">E.</td><td><b>K2point Conversions:</b> QB passing 2-point conversions worth 2 points (not 1).</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">F.</td><td>Starting in the 2021 season, all points will be fractional.</td></tr>
+    </table>
+
+    <div style="margin:16px 0 10px"><b>Offense</b></div>
+    <table>
+      <tr><th style="text-align:left">Action</th><th class="r">Points</th></tr>
+      <tr><td>Each 10 yards rushing</td><td class="r">1</td></tr>
+      <tr><td>Each 10 yards receiving</td><td class="r">1</td></tr>
+      <tr><td>Each 25 yards passing</td><td class="r">1</td></tr>
+      <tr><td>Each reception</td><td class="r">0.5</td></tr>
+      <tr><td>Passing TD</td><td class="r">4</td></tr>
+      <tr><td>Rushing/Receiving TD</td><td class="r">6</td></tr>
+      <tr><td>Offensive Fumble TD Recovery</td><td class="r">6</td></tr>
+      <tr><td>Interception</td><td class="r red">-1</td></tr>
+      <tr><td>Fumble Lost</td><td class="r red">-1</td></tr>
+    </table>
+
+    <div style="margin:16px 0 10px"><b>Defense</b></div>
+    <table>
+      <tr><th style="text-align:left">Action</th><th class="r">Points</th></tr>
+      <tr><td>Interception</td><td class="r">1</td></tr>
+      <tr><td>Fumble Recovery</td><td class="r">1</td></tr>
+      <tr><td>Sack</td><td class="r">1</td></tr>
+      <tr><td>Fumble Return for TD</td><td class="r">6</td></tr>
+      <tr><td>Interception for TD</td><td class="r">6</td></tr>
+      <tr><td>Safety</td><td class="r">2</td></tr>
+      <tr><td>Yards Allowed &lt; 200</td><td class="r">10</td></tr>
+      <tr><td>Yards Allowed 200–299</td><td class="r">7</td></tr>
+      <tr><td>Yards Allowed 300–399</td><td class="r">3</td></tr>
+      <tr><td>Yards Allowed 400+</td><td class="r">0</td></tr>
+    </table>
+
+    <div style="margin:16px 0 10px"><b>Special Teams</b></div>
+    <table>
+      <tr><th style="text-align:left">Action</th><th class="r">Points</th></tr>
+      <tr><td>PAT</td><td class="r">1</td></tr>
+      <tr><td>Passing 2pt. Conversion</td><td class="r">2</td></tr>
+      <tr><td>Rushing/Receiving 2pt. Conversion</td><td class="r">2</td></tr>
+      <tr><td>Field Goal 0–29 yards</td><td class="r">3</td></tr>
+      <tr><td>Field Goal 30–39 yards</td><td class="r">4</td></tr>
+      <tr><td>Field Goal 40–49 yards</td><td class="r">5</td></tr>
+      <tr><td>Field Goal 50+ yards</td><td class="r">6</td></tr>
+      <tr><td>Block Punt for TD</td><td class="r">6</td></tr>
+      <tr><td>Punt Return for TD</td><td class="r">6</td></tr>
+      <tr><td>Kickoff Return for TD</td><td class="r">6</td></tr>
+      <tr><td>Blocked Field Goal for TD</td><td class="r">6</td></tr>
+      <tr><td>Returned PAT</td><td class="r">2</td></tr>
+    </table>
+
+    <div style="margin:16px 0 10px"><b>Miscellaneous</b></div>
+    <table>
+      <tr><th style="text-align:left">Action</th><th class="r">Points</th></tr>
+      <tr><td>Home Field Advantage (playoffs only)</td><td class="r">5</td></tr>
+    </table>
+  </div>
+  </div>
+
+  <div class="rsec" id="rPlayoffs">
+  <div class="card" style="margin-bottom:14px">
+    <h3>XI. Playoffs</h3>
+    <table>
+      <tr><td style="width:30px;vertical-align:top;color:var(--mut2)">A.</td><td>The four divisional winners will advance to the playoffs.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">B.</td><td>The two remaining teams with the best records will be wild card teams.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">C.</td><td>The two divisional championship teams with the best records will have 1st round byes.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">D.</td><td>Tie-breaker order:
+        <div style="margin:6px 0 0 16px">
+          1. Overall record<br>
+          2. Head-to-Head record<br>
+          3. Divisional record<br>
+          4. Total points of the 14 regular season games
+        </div>
+      </td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">E.</td><td>Playoff schedule:
+        <div style="margin:6px 0 0 16px">
+          <b>1st week:</b> Wild Card #2 vs. Division Winner #3 (5 bonus pts) · Wild Card #1 vs. Division Winner #4 (5 bonus pts)<br>
+          <b>2nd week:</b> WC Winner #1 vs. Division Winner #2 (5 bonus pts) · WC Winner #2 vs. Division Winner #1 (5 bonus pts)<br>
+          <b>Finals:</b> Two semi-finals winners<br>
+          <b>Consolation:</b> Two semi-finals losers
+        </div>
+      </td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">F.</td><td>The scoring system will remain the same for the playoffs.</td></tr>
+    </table>
+  </div>
+  </div>
+
+  <div class="rsec" id="rKeepers">
+  <div class="card" style="margin-bottom:14px">
+    <h3>XII. Squad Keeper Rules</h3>
+    <table>
+      <tr><td style="width:30px;vertical-align:top;color:var(--mut2)">A.</td><td>Each owner may keep up to <b>six (6) players</b> after each year.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">B.</td><td>An owner can only protect a player on his roster for a <b>maximum of 3 consecutive years</b>.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">C.</td><td>Players that are protected for three (3) years will automatically be dropped from the team and submitted into next year's free agent pool.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">D.</td><td>At the end of the third year an owner may declare <b>one franchise player</b>. This will enable the owner to keep this player a maximum of another <b>two (2) years</b>.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">E.</td><td>The player that is kept on the roster from one year to another has his <b>salary remain the same</b>.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">F.</td><td>Players that are not protected will become free agents for the following year.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">G.</td><td>Dropped player's salaries are subject to change.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">H.</td><td>Owners must submit their keeper squad <b>only</b> to the commissioner by August 11, 2025 at 8:00am. If owners are late they will be penalized by forfeiting their first draft pick.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">J.</td><td>Draft order for the next season: the Super Bowl champion will select last and the 6 teams to not make the playoffs will be entered into the draft lottery to determine the first 6 picks of the draft.</td></tr>
+    </table>
+  </div>
+  </div>
+
+  <div class="rsec" id="rChanges">
+  <div class="card" style="margin-bottom:14px">
+    <h3>XIII. Rule Changes</h3>
+    <table>
+      <tr><td style="width:30px;vertical-align:top;color:var(--mut2)">A.</td><td>Rule changes will be voted on prior to the draft on draft day.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">B.</td><td>Rule changes must receive <b>two-thirds majority vote</b> in order to be enacted.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">C.</td><td>Rule change proposals must be received by the commissioner prior to the draft and must be submitted with the second from another owner.</td></tr>
+      <tr><td style="vertical-align:top;color:var(--mut2)">D.</td><td><b>Rule Change Amendment:</b> Rule changes submitted during the season that receive the <b>unanimous league vote</b> will be implemented at the start of the next league week. Otherwise, rule changes approved with 2/3 majority will be implemented the next league season.</td></tr>
+    </table>
+  </div>
+  </div>
+
+  <div class="card" style="margin-top:14px;text-align:center">
+    <div class="sm mut2">SacVerde Fantasy Football League Constitution · Est. 2003 · All rules subject to 2/3 majority amendment</div>
+  </div>`;
+}
+
+function ruleTab(btn, id){
+  document.querySelectorAll('#ruleTabs button').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  const all = id==='rAll';
+  document.querySelectorAll('.rsec').forEach(el=>{
+    el.style.display = (all || el.id===id) ? '' : 'none';
+  });
+}
+
+// ---------- render ----------
+function render(){
+  nav();
+  const v = {home:vHome, teams:vTeams, schedule:vSchedule, draft:vDraft, salary:vSalary, financials:vFinancials, bids:vBids, match:vMatch, forum:vForum, history:vHistory, rules:vRules, office:vOffice}[state.view];
+  $("#app").innerHTML = v() + `<div class="footer-cta">SACVERDE LEAGUE PLATFORM \u00b7 2025 history archive \u00b7 2026 season live</div>`;
+}
+</script>
+<script src="supabase.js"></script>
+<script src="live.js"></script>
+</body>
+</html>
