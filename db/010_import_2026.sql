@@ -1,9 +1,9 @@
 -- =====================================================================
 -- SacVerde League — 010: import 2026 season from the league's Google Sheets (2026-10-31)
 -- Sources: SacVerdeLeague2026.xlsx (team sheets, results, trades), 2026_SalaryList.xlsx (official list)
--- Run AFTER 009. Run ONCE.
+-- Run AFTER 009. Safe to re-run (every step checks what already exists).
 -- =====================================================================
-begin;
+create schema if not exists sv_import;   -- private staging area (not exposed to the website)
 -- names + divisions for 2026
 update public.teams set name = 'Purple Reign' where name = 'Tritons';
 update public.divisions set name = 'Sailgating Syndicate' where name = 'Deez Knutes';
@@ -27,8 +27,8 @@ insert into public.league_members (email, team_id, display_name, phone, role) se
 insert into public.league_members (email, team_id, display_name, phone, role) select 'spandexboy@hotmail.com', id, 'Scott Greensides', '(831) 521-2725', 'manager' from public.teams where name = 'Assassins' on conflict (email) do update set team_id = excluded.team_id, display_name = excluded.display_name, phone = coalesce(excluded.phone, public.league_members.phone);
 insert into public.transactions (season, kind, details) values (2026, 'member_import', '{"source":"2026 team sheets"}');
 -- official 2026 salary list: update existing players, add new ones, retire the rest
-create temp table off26 (name text, pos text, nfl text, rookie boolean, sal int) on commit drop;
-insert into off26 values
+drop table if exists sv_import.off26; create table sv_import.off26 (name text, pos text, nfl text, rookie boolean, sal int);
+insert into sv_import.off26 values
  ('Ja''Marr Chase','WR','CIN',false,40),
  ('Jahmyr Gibbs','RB','DET',false,40),
  ('Bijan Robinson','RB','ATL',false,39),
@@ -1138,21 +1138,21 @@ insert into off26 values
  ('Travis Hunter','WR','JAX',false,2),
  ('Najee Harris','RB','NYG',false,2),
  ('Darren Waller','TE','CAR',false,2);
-create temp table pmap on commit drop as
+drop table if exists sv_import.pmap; create table sv_import.pmap as
   select o.*, (select p.id from public.players p
                 where regexp_replace(lower(regexp_replace(p.name,'\m(jr|sr|ii|iii|iv)\M\.?','','gi')),'[^a-z0-9]','','g')
                     = regexp_replace(lower(regexp_replace(o.name,'\m(jr|sr|ii|iii|iv)\M\.?','','gi')),'[^a-z0-9]','','g')
                   and (p.pos = o.pos or (o.pos = 'K' and p.pos = 'P'))
                 order by (p.nfl_team = o.nfl) desc, p.id limit 1) as pid
-  from off26 o;
-update public.players p set name = m.name, pos = m.pos, nfl_team = m.nfl, rookie = m.rookie, active = true from pmap m where p.id = m.pid;
-with ins as (insert into public.players (name, pos, nfl_team, rookie) select name, pos, nfl, rookie from pmap where pid is null returning id, name, pos) update pmap m set pid = ins.id from ins where m.pid is null and ins.name = m.name and ins.pos = m.pos;
-update public.players set active = false where id not in (select pid from pmap);
-delete from public.player_salaries s where season = 2026 and player_id not in (select pid from pmap) and not exists (select 1 from public.bids b where b.player_id = s.player_id);
-insert into public.player_salaries (season, player_id, list_salary) select 2026, pid, sal from pmap on conflict (season, player_id) do update set list_salary = excluded.list_salary;
+  from sv_import.off26 o;
+update public.players p set name = m.name, pos = m.pos, nfl_team = m.nfl, rookie = m.rookie, active = true from sv_import.pmap m where p.id = m.pid;
+with ins as (insert into public.players (name, pos, nfl_team, rookie) select name, pos, nfl, rookie from sv_import.pmap where pid is null returning id, name, pos) update sv_import.pmap m set pid = ins.id from ins where m.pid is null and ins.name = m.name and ins.pos = m.pos;
+update public.players set active = false where id not in (select pid from sv_import.pmap where pid is not null);
+delete from public.player_salaries s where season = 2026 and player_id not in (select pid from sv_import.pmap where pid is not null) and not exists (select 1 from public.bids b where b.player_id = s.player_id);
+insert into public.player_salaries (season, player_id, list_salary) select 2026, pid, sal from sv_import.pmap on conflict (season, player_id) do update set list_salary = excluded.list_salary;
 -- 2026 rosters (team sheets + Oct 30-31 trades from the TRADES tab)
-create temp table r26 (team text, name text, pos text, status text, salary int, contract text, ir int, via text) on commit drop;
-insert into r26 values
+drop table if exists sv_import.r26; create table sv_import.r26 (team text, name text, pos text, status text, salary int, contract text, ir int, via text);
+insert into sv_import.r26 values
  ('Rhin-Owned','Pat Bryant','WR','ir',3,null,6,'keeper'),
  ('Rhin-Owned','Davante Adams','WR','ir',18,'3',8,'keeper'),
  ('Rhin-Owned','Joe Burrow','QB','active',18,'5F',null,'keeper'),
@@ -1400,51 +1400,54 @@ insert into r26 values
  ('Assassins','Kaleb Johnson','RB','taxi',18,null,null,'keeper');
 insert into public.roster_spots (season, team_id, player_id, status, salary, contract, acquired_via, ir_since_week)
   select 2026, t.id, m.pid, r.status, r.salary, r.contract, case when r.via = 'trade' then 'trade' else 'keeper' end, r.ir
-    from r26 r join public.teams t on t.name = r.team join pmap m on m.name = r.name and m.pos = r.pos;
+    from sv_import.r26 r join public.teams t on t.name = r.team join sv_import.pmap m on m.name = r.name and m.pos = r.pos
+  on conflict (season, player_id) do update set team_id = excluded.team_id, status = excluded.status, salary = excluded.salary,
+     contract = excluded.contract, acquired_via = excluded.acquired_via, ir_since_week = excluded.ir_since_week;
 -- 2026 results, weeks 1-7
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 1, h.id, a.id, 66.06, 124.82 from public.teams h, public.teams a where h.name = 'Rhin-Owned' and a.name = 'Purple Reign';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 1, h.id, a.id, 168.36, 141.26 from public.teams h, public.teams a where h.name = '3 Nuggles' and a.name = 'K2''s Kings';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 1, h.id, a.id, 144.26, 76.84 from public.teams h, public.teams a where h.name = 'Assassins' and a.name = 'Milky Wet Hogs';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 1, h.id, a.id, 137.86, 103.86 from public.teams h, public.teams a where h.name = 'da bombers' and a.name = 'Roaring Hoogy';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 1, h.id, a.id, 126.66, 122.12 from public.teams h, public.teams a where h.name = 'Pool Boy' and a.name = 'Alligator Arms';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 1, h.id, a.id, 79.3, 103.74 from public.teams h, public.teams a where h.name = 'Steel Curtain' and a.name = 'Juggernauts';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 2, h.id, a.id, 63.98, 114.56 from public.teams h, public.teams a where h.name = 'Rhin-Owned' and a.name = 'Steel Curtain';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 2, h.id, a.id, 139.32, 68.52 from public.teams h, public.teams a where h.name = '3 Nuggles' and a.name = 'Alligator Arms';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 2, h.id, a.id, 118.16, 89.12 from public.teams h, public.teams a where h.name = 'Purple Reign' and a.name = 'Milky Wet Hogs';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 2, h.id, a.id, 150.22, 77.78 from public.teams h, public.teams a where h.name = 'Pool Boy' and a.name = 'da bombers';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 2, h.id, a.id, 114.14, 82.8 from public.teams h, public.teams a where h.name = 'Roaring Hoogy' and a.name = 'K2''s Kings';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 2, h.id, a.id, 114.78, 133.88 from public.teams h, public.teams a where h.name = 'Assassins' and a.name = 'Juggernauts';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 3, h.id, a.id, 109.98, 99.54 from public.teams h, public.teams a where h.name = 'Rhin-Owned' and a.name = 'Milky Wet Hogs';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 3, h.id, a.id, 110.6, 157.68 from public.teams h, public.teams a where h.name = '3 Nuggles' and a.name = 'Roaring Hoogy';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 3, h.id, a.id, 102.66, 100.48 from public.teams h, public.teams a where h.name = 'Alligator Arms' and a.name = 'da bombers';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 3, h.id, a.id, 125.94, 87.64 from public.teams h, public.teams a where h.name = 'Steel Curtain' and a.name = 'Assassins';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 3, h.id, a.id, 106.32, 108.36 from public.teams h, public.teams a where h.name = 'Purple Reign' and a.name = 'Juggernauts';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 3, h.id, a.id, 135.16, 110.14 from public.teams h, public.teams a where h.name = 'Pool Boy' and a.name = 'K2''s Kings';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 4, h.id, a.id, 101.52, 98.22 from public.teams h, public.teams a where h.name = 'Rhin-Owned' and a.name = '3 Nuggles';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 4, h.id, a.id, 146.42, 142.68 from public.teams h, public.teams a where h.name = 'Purple Reign' and a.name = 'K2''s Kings';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 4, h.id, a.id, 112.6, 81.56 from public.teams h, public.teams a where h.name = 'Roaring Hoogy' and a.name = 'Milky Wet Hogs';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 4, h.id, a.id, 105.46, 126.68 from public.teams h, public.teams a where h.name = 'Alligator Arms' and a.name = 'Steel Curtain';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 4, h.id, a.id, 157.62, 120.48 from public.teams h, public.teams a where h.name = 'Pool Boy' and a.name = 'Juggernauts';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 4, h.id, a.id, 71.4, 76.82 from public.teams h, public.teams a where h.name = 'Assassins' and a.name = 'da bombers';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 5, h.id, a.id, 139.8, 78.9 from public.teams h, public.teams a where h.name = 'Rhin-Owned' and a.name = 'K2''s Kings';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 5, h.id, a.id, 99.1, 131.76 from public.teams h, public.teams a where h.name = 'Purple Reign' and a.name = 'Roaring Hoogy';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 5, h.id, a.id, 97.58, 86.72 from public.teams h, public.teams a where h.name = '3 Nuggles' and a.name = 'Milky Wet Hogs';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 5, h.id, a.id, 133.16, 146.24 from public.teams h, public.teams a where h.name = 'Alligator Arms' and a.name = 'Juggernauts';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 5, h.id, a.id, 133.28, 108.62 from public.teams h, public.teams a where h.name = 'da bombers' and a.name = 'Steel Curtain';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 5, h.id, a.id, 109.74, 133.8 from public.teams h, public.teams a where h.name = 'Assassins' and a.name = 'Pool Boy';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 6, h.id, a.id, 78.18, 140.8 from public.teams h, public.teams a where h.name = 'Rhin-Owned' and a.name = 'Roaring Hoogy';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 6, h.id, a.id, 72.68, 93.7 from public.teams h, public.teams a where h.name = 'Assassins' and a.name = 'Alligator Arms';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 6, h.id, a.id, 79.78, 127.36 from public.teams h, public.teams a where h.name = 'Purple Reign' and a.name = '3 Nuggles';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 6, h.id, a.id, 101.16, 97.52 from public.teams h, public.teams a where h.name = 'K2''s Kings' and a.name = 'Milky Wet Hogs';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 6, h.id, a.id, 91.44, 94.0 from public.teams h, public.teams a where h.name = 'Steel Curtain' and a.name = 'Pool Boy';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 6, h.id, a.id, 100.08, 111.86 from public.teams h, public.teams a where h.name = 'Juggernauts' and a.name = 'da bombers';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 7, h.id, a.id, 125.58, 83.72 from public.teams h, public.teams a where h.name = 'Rhin-Owned' and a.name = 'Juggernauts';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 7, h.id, a.id, 121.48, 92.52 from public.teams h, public.teams a where h.name = 'Purple Reign' and a.name = 'Assassins';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 7, h.id, a.id, 94.46, 73.98 from public.teams h, public.teams a where h.name = 'Steel Curtain' and a.name = 'Milky Wet Hogs';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 7, h.id, a.id, 110.42, 124.02 from public.teams h, public.teams a where h.name = 'da bombers' and a.name = '3 Nuggles';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 7, h.id, a.id, 129.08, 125.2 from public.teams h, public.teams a where h.name = 'Pool Boy' and a.name = 'Roaring Hoogy';
-insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 7, h.id, a.id, 82.72, 134.14 from public.teams h, public.teams a where h.name = 'K2''s Kings' and a.name = 'Alligator Arms';
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 1, h.id, a.id, 66.06, 124.82 from public.teams h, public.teams a where h.name = 'Rhin-Owned' and a.name = 'Purple Reign' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 1, h.id, a.id, 168.36, 141.26 from public.teams h, public.teams a where h.name = '3 Nuggles' and a.name = 'K2''s Kings' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 1, h.id, a.id, 144.26, 76.84 from public.teams h, public.teams a where h.name = 'Assassins' and a.name = 'Milky Wet Hogs' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 1, h.id, a.id, 137.86, 103.86 from public.teams h, public.teams a where h.name = 'da bombers' and a.name = 'Roaring Hoogy' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 1, h.id, a.id, 126.66, 122.12 from public.teams h, public.teams a where h.name = 'Pool Boy' and a.name = 'Alligator Arms' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 1, h.id, a.id, 79.3, 103.74 from public.teams h, public.teams a where h.name = 'Steel Curtain' and a.name = 'Juggernauts' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 2, h.id, a.id, 63.98, 114.56 from public.teams h, public.teams a where h.name = 'Rhin-Owned' and a.name = 'Steel Curtain' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 2, h.id, a.id, 139.32, 68.52 from public.teams h, public.teams a where h.name = '3 Nuggles' and a.name = 'Alligator Arms' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 2, h.id, a.id, 118.16, 89.12 from public.teams h, public.teams a where h.name = 'Purple Reign' and a.name = 'Milky Wet Hogs' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 2, h.id, a.id, 150.22, 77.78 from public.teams h, public.teams a where h.name = 'Pool Boy' and a.name = 'da bombers' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 2, h.id, a.id, 114.14, 82.8 from public.teams h, public.teams a where h.name = 'Roaring Hoogy' and a.name = 'K2''s Kings' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 2, h.id, a.id, 114.78, 133.88 from public.teams h, public.teams a where h.name = 'Assassins' and a.name = 'Juggernauts' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 3, h.id, a.id, 109.98, 99.54 from public.teams h, public.teams a where h.name = 'Rhin-Owned' and a.name = 'Milky Wet Hogs' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 3, h.id, a.id, 110.6, 157.68 from public.teams h, public.teams a where h.name = '3 Nuggles' and a.name = 'Roaring Hoogy' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 3, h.id, a.id, 102.66, 100.48 from public.teams h, public.teams a where h.name = 'Alligator Arms' and a.name = 'da bombers' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 3, h.id, a.id, 125.94, 87.64 from public.teams h, public.teams a where h.name = 'Steel Curtain' and a.name = 'Assassins' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 3, h.id, a.id, 106.32, 108.36 from public.teams h, public.teams a where h.name = 'Purple Reign' and a.name = 'Juggernauts' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 3, h.id, a.id, 135.16, 110.14 from public.teams h, public.teams a where h.name = 'Pool Boy' and a.name = 'K2''s Kings' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 4, h.id, a.id, 101.52, 98.22 from public.teams h, public.teams a where h.name = 'Rhin-Owned' and a.name = '3 Nuggles' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 4, h.id, a.id, 146.42, 142.68 from public.teams h, public.teams a where h.name = 'Purple Reign' and a.name = 'K2''s Kings' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 4, h.id, a.id, 112.6, 81.56 from public.teams h, public.teams a where h.name = 'Roaring Hoogy' and a.name = 'Milky Wet Hogs' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 4, h.id, a.id, 105.46, 126.68 from public.teams h, public.teams a where h.name = 'Alligator Arms' and a.name = 'Steel Curtain' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 4, h.id, a.id, 157.62, 120.48 from public.teams h, public.teams a where h.name = 'Pool Boy' and a.name = 'Juggernauts' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 4, h.id, a.id, 71.4, 76.82 from public.teams h, public.teams a where h.name = 'Assassins' and a.name = 'da bombers' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 5, h.id, a.id, 139.8, 78.9 from public.teams h, public.teams a where h.name = 'Rhin-Owned' and a.name = 'K2''s Kings' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 5, h.id, a.id, 99.1, 131.76 from public.teams h, public.teams a where h.name = 'Purple Reign' and a.name = 'Roaring Hoogy' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 5, h.id, a.id, 97.58, 86.72 from public.teams h, public.teams a where h.name = '3 Nuggles' and a.name = 'Milky Wet Hogs' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 5, h.id, a.id, 133.16, 146.24 from public.teams h, public.teams a where h.name = 'Alligator Arms' and a.name = 'Juggernauts' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 5, h.id, a.id, 133.28, 108.62 from public.teams h, public.teams a where h.name = 'da bombers' and a.name = 'Steel Curtain' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 5, h.id, a.id, 109.74, 133.8 from public.teams h, public.teams a where h.name = 'Assassins' and a.name = 'Pool Boy' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 6, h.id, a.id, 78.18, 140.8 from public.teams h, public.teams a where h.name = 'Rhin-Owned' and a.name = 'Roaring Hoogy' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 6, h.id, a.id, 72.68, 93.7 from public.teams h, public.teams a where h.name = 'Assassins' and a.name = 'Alligator Arms' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 6, h.id, a.id, 79.78, 127.36 from public.teams h, public.teams a where h.name = 'Purple Reign' and a.name = '3 Nuggles' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 6, h.id, a.id, 101.16, 97.52 from public.teams h, public.teams a where h.name = 'K2''s Kings' and a.name = 'Milky Wet Hogs' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 6, h.id, a.id, 91.44, 94.0 from public.teams h, public.teams a where h.name = 'Steel Curtain' and a.name = 'Pool Boy' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 6, h.id, a.id, 100.08, 111.86 from public.teams h, public.teams a where h.name = 'Juggernauts' and a.name = 'da bombers' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 7, h.id, a.id, 125.58, 83.72 from public.teams h, public.teams a where h.name = 'Rhin-Owned' and a.name = 'Juggernauts' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 7, h.id, a.id, 121.48, 92.52 from public.teams h, public.teams a where h.name = 'Purple Reign' and a.name = 'Assassins' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 7, h.id, a.id, 94.46, 73.98 from public.teams h, public.teams a where h.name = 'Steel Curtain' and a.name = 'Milky Wet Hogs' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 7, h.id, a.id, 110.42, 124.02 from public.teams h, public.teams a where h.name = 'da bombers' and a.name = '3 Nuggles' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 7, h.id, a.id, 129.08, 125.2 from public.teams h, public.teams a where h.name = 'Pool Boy' and a.name = 'Roaring Hoogy' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
+insert into public.matchups (season, week, home_team, away_team, home_pts, away_pts) select 2026, 7, h.id, a.id, 82.72, 134.14 from public.teams h, public.teams a where h.name = 'K2''s Kings' and a.name = 'Alligator Arms' on conflict (season, week, home_team) do update set away_team = excluded.away_team, home_pts = excluded.home_pts, away_pts = excluded.away_pts;
 -- standings after each week (rank 1 = best). Week 0 = preseason order used by the Week 1 FA sheet.
+delete from public.standings where season = 2026 and week between 0 and 7;
 insert into public.standings (season, week, team_id, rank) select 2026, 0, id, 12 from public.teams where name = 'da bombers';
 insert into public.standings (season, week, team_id, rank) select 2026, 0, id, 5 from public.teams where name = 'Steel Curtain';
 insert into public.standings (season, week, team_id, rank) select 2026, 0, id, 3 from public.teams where name = 'Roaring Hoogy';
@@ -1543,4 +1546,4 @@ insert into public.standings (season, week, team_id, rank, wins, losses, ties, p
 insert into public.standings (season, week, team_id, rank, wins, losses, ties, pf) select 2026, 7, id, 12, 0, 7, 0, 605.28 from public.teams where name = 'Milky Wet Hogs';
 update public.seasons set current_week = public.league_week(2026) where year = 2026;
 insert into public.transactions (season, kind, details) values (2026, 'season_import', '{"source":"SacVerdeLeague2026.xlsx + 2026_SalaryList.xlsx"}');
-commit;
+drop schema sv_import cascade;   -- clean up staging
