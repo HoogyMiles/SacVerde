@@ -124,7 +124,7 @@ with sync_playwright() as p:
     body = pg.inner_text("body")
     check("valid bid sealed and listed", "Sealed: Jauan Jennings for $8" in body and "YOUR SEALED BIDS · WEEK 9 (2)" in body.upper(), body[:800])
     pg.evaluate("go('forum')"); pg.wait_for_timeout(400)
-    pg.fill("#chatmsg", "Testing the new forum 🔥"); pg.click("text=Send"); pg.wait_for_timeout(800)
+    pg.fill("#chatmsg", "Testing the new forum 🔥"); pg.click("text=Send"); pg.wait_for_function("document.querySelector('#chatlog') && document.querySelector('#chatlog').innerText.includes('Testing the new forum')", timeout=15000)
     check("forum post saved", "Testing the new forum" in pg.inner_text("#chatlog"))
     pg.screenshot(path="/home/claude/e2e/forum.png")
     check("no JS errors (Purple Reign)", not errs, "; ".join(errs))
