@@ -42,7 +42,7 @@ function build2026(){
   const teamDiv = {}; LIVE.teamRows.forEach(t=>teamDiv[t.name]=divName[t.division_id]);
   const rec = {}; Object.values(byId).forEach(n=>rec[n]={w:0,l:0,t:0,dw:0,dl:0,dt:0,pf:0,pa:0,sched:[]});
   const weeks = {};
-  LIVE.m26.forEach(m=>{
+  LIVE.m26.filter(m=>m.home_pts!=null && m.away_pts!=null && !m.playoff).forEach(m=>{
     const h=byId[m.home_team], a=byId[m.away_team], hs=+m.home_pts, as=+m.away_pts;
     (weeks[m.week]=weeks[m.week]||[]).push({home:h, hs, away:a, as});
     [[h,hs,a,as],[a,as,h,hs]].forEach(([me,ms,op,os])=>{
@@ -57,7 +57,7 @@ function build2026(){
   const divisions = {};
   Object.values(byId).forEach(n=>{ const d=teamDiv[n]; (divisions[d]=divisions[d]||[]).push(n); });
   Object.keys(divisions).forEach(d=>{
-    divisions[d] = divisions[d].sort((a,b)=>(rankOf[LIVE.teamId[a]]||99)-(rankOf[LIVE.teamId[b]]||99))
+    divisions[d] = rankGroup(divisions[d].map(n=>LIVE.teamId[n])).map(id=>byId[id])
       .map((n,i)=>({rank:i+1, team:n, w:String(rec[n].w), l:String(rec[n].l), t:String(rec[n].t), dw:String(rec[n].dw), dl:String(rec[n].dl), dt:String(rec[n].dt), pts:rec[n].pf}));
   });
   const teams = {};
@@ -69,7 +69,7 @@ function build2026(){
     const divRank = (divisions[teamDiv[n]].find(x=>x.team===n)||{}).rank;
     teams[n] = {
       name:n, roster:spots.filter(x=>x.status==="active"), taxi:spots.filter(x=>x.status==="taxi"), ir:spots.filter(x=>x.status==="ir"),
-      schedule:rec[n].sched, transactions:[], picks:picksFor(tid),
+      schedule:rec[n].sched, transactions:teamTx(n, tid), picks:picksFor(tid),
       info:{owners: owner&&owner.display_name, division:teamDiv[n], record:[String(rec[n].w),String(rec[n].l),String(rec[n].t)],
             div_record:[String(rec[n].dw),String(rec[n].dl),String(rec[n].dt)], pf:rec[n].pf.toFixed(2), pa:rec[n].pa.toFixed(2),
             ppg: gp?(rec[n].pf/gp).toFixed(2):"-", standing: divRank?ord(divRank):""},
@@ -89,6 +89,53 @@ function build2026(){
   if(yrs.length) PICK_YEARS = yrs.slice(0,2);
   state.week = Math.max(1, ...Object.keys(weeks).map(Number));
 }
+// Human-readable log lines for a team: sheet history first, then moves made on the site
+function teamTx(name, tid){
+  const P = id=>(LIVE.byId[id]||{}).name||"a player", T = id=>LIVE.teamsById[id]||"?";
+  const line = x=>{ const d=x.details||{}, w=x.week?` (wk ${x.week})`:"";
+    switch(x.kind){
+      case "add": return `Added ${P(x.player_id)} for $${x.amount}${w}`;
+      case "drop": return `Dropped ${P(x.player_id)}${w}`;
+      case "forced_drop": return `Penalty drop: ${P(x.player_id)}${w}`;
+      case "forfeit": return `Automatic loss — not cap/roster legal at Sunday 9:55am${w}`;
+      case "ir_on": return `Moved ${P(x.player_id)} to IR${w}`;
+      case "ir_off": return `Activated ${P(x.player_id)} from IR${w}`;
+      case "taxi_promote": return `Promoted ${P(x.player_id)} from the taxi squad${w}`;
+      case "taxi_add": return `Moved ${P(x.player_id)} to the taxi squad${w}`;
+      case "trade_in": return `Acquired ${P(x.player_id)} by trade${w}`;
+      case "trade_out": return `Traded ${P(x.player_id)}${w}`;
+      case "commissioner_roster": return `Commissioner: ${P(x.player_id)} placed on roster (${d.status||""}, $${x.amount})${w}`;
+      case "commissioner_release": return `Commissioner: ${P(x.player_id)} released${w}`;
+      default: return null; } };
+  const site = (LIVE.tx||[]).filter(x=>x.team_id===tid && x.kind!=="roster_add" && x.kind!=="roster_remove" && x.kind!=="roster_change").map(line).filter(Boolean);
+  const sheet = (LIVE.txSheet||{})[name] || [];
+  return [...sheet, ...site];
+}
+// Order a group of teams by the constitution tiebreakers, comparing only the teams in the group:
+// overall record -> head-to-head among teams still tied -> division record -> total points
+function rankGroup(ids){
+  const div = {}; LIVE.teamRows.forEach(t=>div[t.id]=t.division_id);
+  const games = LIVE.m26.filter(m=>m.home_pts!=null && m.away_pts!=null && !m.playoff);
+  const st = {}; ids.forEach(t=>st[t]={wp:0,gp:0,dwp:0,dgp:0,pf:0});
+  const res = (me,op,ms,os)=>{ const r=st[me]; if(!r) return; const w=ms>os?1:ms===os?0.5:0; r.wp+=w; r.gp++; r.pf+=ms; if(div[me]===div[op]){ r.dwp+=w; r.dgp++; } };
+  games.forEach(m=>{ res(m.home_team,m.away_team,+m.home_pts,+m.away_pts); res(m.away_team,m.home_team,+m.away_pts,+m.home_pts); });
+  const pct = t=>st[t].gp?st[t].wp/st[t].gp:0, dpct = t=>st[t].dgp?st[t].dwp/st[t].dgp:0;
+  const h2h = (t, group)=>{ let w=0,g=0; games.forEach(m=>{ const opp = m.home_team===t?m.away_team:m.away_team===t?m.home_team:null;
+      if(opp!=null && group.includes(opp)){ const ms=m.home_team===t?+m.home_pts:+m.away_pts, os=m.home_team===t?+m.away_pts:+m.home_pts; w+=ms>os?1:ms===os?0.5:0; g++; } }); return g?w/g:0; };
+  const out = [], byPct = {};
+  ids.forEach(t=>{ const k=pct(t).toFixed(6); (byPct[k]=byPct[k]||[]).push(t); });
+  Object.keys(byPct).sort((a,b)=>b-a).forEach(k=>{ const g=byPct[k];
+    out.push(...g.sort((a,b)=>(h2h(b,g)-h2h(a,g)) || (dpct(b)-dpct(a)) || (st[b].pf-st[a].pf) || (a-b))); });
+  return out;
+}
+// Playoff seeding if the season ended today (constitution XI): 4 division winners + 2 wildcards; top 2 division winners get byes
+function playoffPicture(){
+  const latest = Math.max(...Object.keys(LIVE.standings).map(Number)); if(!(latest>=1)) return null;
+  const byDiv = {}; LIVE.teamRows.forEach(t=>(byDiv[t.division_id]=byDiv[t.division_id]||[]).push(t.id));
+  const winners = rankGroup(Object.values(byDiv).map(ids=>rankGroup(ids)[0]));
+  const wild = rankGroup(LIVE.teamRows.map(t=>t.id).filter(t=>!winners.includes(t))).slice(0,2);
+  return {week: latest, seeds:[...winners, ...wild].map((t,i)=>({seed:i+1, team:LIVE.teamsById[t], tag: i<2?"bye":i<4?"division winner":"wildcard"}))};
+}
 const ORD = n=>n+(["th","st","nd","rd"][(n%100-20)%10]||["th","st","nd","rd"][n%100]||"th");
 const pickLabel = (p, owner)=>`${p.draft_year} ${ORD(p.round)}${p.original_team!==owner?` (${LIVE.teamsById[p.original_team]})`:""}`;
 function picksFor(tid){
@@ -96,6 +143,35 @@ function picksFor(tid){
     (out[p.draft_year]=out[p.draft_year]||[]).push(ORD(p.round)+(p.original_team!==tid?` (${LIVE.teamsById[p.original_team]})`:"")); });
   return out;
 }
+// Rules: 2026 rule document, with the 2025 version one click away
+(function(){ const orig = window.vRules; window.vRules = function(){
+  if(typeof RULES_2026_HTML==="undefined" || state.rules2025) return `<div class="flex" style="margin-bottom:8px">${typeof RULES_2026_HTML!=="undefined"?`<button class="btn ghost sm" onclick="state.rules2025=false;render()">← 2026 rules</button>`:""}</div>`+orig();
+  return `<h1>League Rules · 2026</h1><div class="sub">From the 2026 rule document. Crossed-out text is left out. <a onclick="state.rules2025=true;render()">View the 2025 version</a></div>`+RULES_2026_HTML;
+}; })();
+// Matchup Center: real final scores only (player-by-player scoring comes with Yahoo sync)
+window.openMatch = function(week, gi){ state.view="match"; state.week=+week; state.gi=gi; render(); window.scrollTo(0,0); };
+window.vMatch = function(){
+  if(!LIVE.m26 || !LIVE.m26.length) return `<h1>Matchup Center</h1><div class="note">No games loaded yet.</div>`;
+  const weeks = [...new Set(LIVE.m26.map(m=>m.week))].sort((a,b)=>a-b);
+  const wk = +(state.week || weeks[0]);
+  const games = LIVE.m26.filter(m=>m.week===wk);
+  const team = id=>esc(LIVE.teamsById[id]);
+  return `<h1>Matchup Center</h1>
+  <div class="sub">Final scores by week. Live player-by-player scoring arrives with the Yahoo sync.</div>
+  <div class="flex" style="margin:12px 0">Week <select onchange="state.week=this.value;render()">${weeks.map(w=>`<option ${w===wk?"selected":""}>${w}</option>`).join("")}</select></div>
+  <div class="grid g2">${games.map(m=>{ const done = m.home_pts!=null && m.away_pts!=null, hw = done && +m.home_pts > +m.away_pts, aw = done && +m.away_pts > +m.home_pts;
+    return `<div class="card"><div class="spread"><b class="${hw?'grn':''}">${team(m.home_team)}</b><span class="big">${done?(+m.home_pts).toFixed(2):"–"}</span></div>
+      <div class="spread"><b class="${aw?'grn':''}">${team(m.away_team)}</b><span class="big">${done?(+m.away_pts).toFixed(2):"–"}</span></div>
+      <div class="sm mut2" style="margin-top:6px">${done?"Final":"Not played yet"}</div></div>`; }).join("")}</div>`;
+};
+(function(){ const orig = window.vHome; window.vHome = function(){
+  const html = orig(); const pp = (SEASON>2025) ? playoffPicture() : null; if(!pp) return html;
+  const card = `<h2>Playoff Picture <span class="sub">· if the season ended after week ${pp.week}</span></h2>
+    <div class="card"><table><tr><th>Seed</th><th>Team</th><th></th></tr>${pp.seeds.map(s=>`<tr><td>${s.seed}</td><td><a ${tgo(s.team)}>${esc(s.team)}</a></td>
+      <td><span class="pill ${s.tag==="bye"?"g":s.tag==="wildcard"?"b":"y"}">${s.tag}</span></td></tr>`).join("")}</table>
+    <div class="sm mut2" style="margin-top:6px">Four division winners and two wildcards make it. The two division winners with the best records get first-round byes.</div></div>`;
+  const i = html.indexOf('<h2 class="spread">Scoreboard'); return i<0 ? html+card : html.slice(0,i)+card+html.slice(i);
+}; })();
 // Views that show the 2025 archive keep using it
 ["vHistory","vFinancials","vDraft"].forEach(fn=>{
   const orig = window[fn];
@@ -104,7 +180,7 @@ function picksFor(tid){
 });
 async function loadAll(){
   const [{data:mem}, {data:teams}, {data:seasons}, arch, {data:mt}] = await Promise.all([
-    sb.from("league_members").select("email,team_id,role,user_id,display_name"),
+    sb.from("league_members").select("email,team_id,role,user_id,display_name,phone"),
     sb.from("teams").select("id,name,division_id"),
     sb.from("seasons").select("*"),
     fetchAll(()=>sb.from("season_archive").select("season,kind,key,data").eq("season",2025)),
@@ -159,7 +235,7 @@ async function loadSeason(){
     (data||[]).forEach(b=>LIVE.myBids[b.player_id]=b);
   }
   const [m26, divs, tms] = await Promise.all([
-    sb.from("matchups").select("week,home_team,away_team,home_pts,away_pts").eq("season",yr).order("week"),
+    sb.from("matchups").select("id,week,home_team,away_team,home_pts,away_pts,playoff").eq("season",yr).order("week").order("id"),
     sb.from("divisions").select("id,name"),
     sb.from("teams").select("id,name,division_id")]);
   LIVE.m26 = m26.data||[]; LIVE.divs = divs.data||[]; LIVE.teamRows = tms.data||[];
@@ -167,6 +243,10 @@ async function loadSeason(){
     sb.from("trades").select("*").eq("season",yr).order("created_at",{ascending:false}),
     sb.from("trade_items").select("*")]);
   LIVE.trades = tr.data||[]; LIVE.tradeItems = ti.data||[];
+  const [txr, txs] = await Promise.all([
+    fetchAll(()=>sb.from("transactions").select("id,week,kind,team_id,player_id,amount,details,created_at").eq("season",yr).order("id")),
+    sb.from("season_archive").select("key,data").eq("season",yr).eq("kind","team_tx_sheet")]);
+  LIVE.tx = txr||[]; LIVE.txSheet = {}; (txs.data||[]).forEach(r=>LIVE.txSheet[r.key]=r.data);
   const [dp, tp] = await Promise.all([
     sb.from("draft_picks").select("id,draft_year,round,original_team,owner_team").order("draft_year").order("round"),
     sb.from("trade_picks").select("*")]);
@@ -525,6 +605,7 @@ vOffice = function(){
       2026 rosters loaded: <b>${LIVE.roster26.length} players</b>${LIVE.roster26.length?"":" — waiting on the Google Sheet import"}</div></div>
   </div>
   <div style="margin-top:14px">${complianceCard()}</div>
+  <h2>Admin</h2>${adminHTML()}
   <div style="margin-top:20px">${_vOffice()}</div>`;
 };
 async function openWeek(){
@@ -536,6 +617,109 @@ async function openWeek(){
 async function revealWeek(id){
   const {error} = await sb.rpc("reveal_bid_week", {p_week_id:id});
   if(error) return showErr(error); await loadSeason(); state.view="bids"; state.bidTab="reveal"; render();
+}
+
+// ---------- COMMISSIONER ADMIN ----------
+const NFL_ABBR = ["ARI","ATL","BAL","BUF","CAR","CHI","CIN","CLE","DAL","DEN","DET","GB","HOU","IND","JAX","KC","LAC","LAR","LV","MIA","MIN","NE","NO","NYG","NYJ","PHI","PIT","SEA","SF","TB","TEN","WAS","FA"];
+function adminHTML(){
+  const tab = state.adminTab || "results";
+  const tabs = [["results","Scores"],["players","Players & Rosters"],["picks","Draft Picks"],["logins","Logins"],["backup","Backup"]];
+  return `<div class="tabs">${tabs.map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="state.adminTab='${k}';render()">${l}</button>`).join("")}</div>
+  <div class="card">${({results:adminResults, players:adminPlayers, picks:adminPicks, logins:adminLogins, backup:adminBackup})[tab]()}</div>`;
+}
+async function adminCall(fn, args, after){
+  const {data, error} = await sb.rpc(fn, args);
+  if(error) return showErr(error);
+  await loadSeason(); if(LIVE.roster26.length) build2026(); if(after) after(data);
+  flash(typeof data==="string" ? data : "Saved.");
+}
+function adminResults(){
+  const weeks = [...new Set(LIVE.m26.filter(m=>!m.playoff).map(m=>m.week))].sort((a,b)=>a-b);
+  const firstOpen = (weeks.find(w=>LIVE.m26.some(m=>m.week===w && (m.home_pts==null||m.away_pts==null))) || weeks[weeks.length-1]);
+  const wk = +(state.adminWeek || firstOpen);
+  return `<div class="flex" style="margin-bottom:10px">Week <select onchange="state.adminWeek=this.value;render()">${weeks.map(w=>`<option ${w===wk?"selected":""}>${w}</option>`).join("")}</select>
+    <span class="sm mut">Enter final scores from Yahoo. Standings (and bid tiebreaks) update when all games for the week are in.</span></div>
+  <table><tr><th>Home</th><th class="r">Pts</th><th class="r">Pts</th><th>Away</th><th></th></tr>
+  ${LIVE.m26.filter(m=>m.week===wk && !m.playoff).map(m=>`<tr><td>${esc(LIVE.teamsById[m.home_team])}</td>
+    <td class="r"><input type="number" step="0.01" id="hs_${m.id}" value="${m.home_pts??""}" style="width:80px"></td>
+    <td class="r"><input type="number" step="0.01" id="as_${m.id}" value="${m.away_pts??""}" style="width:80px"></td>
+    <td>${esc(LIVE.teamsById[m.away_team])}</td><td><button class="btn sm" onclick="saveScore(${m.id})">Save</button></td></tr>`).join("")}</table>`;
+}
+function saveScore(id){
+  const h = parseFloat($("#hs_"+id).value), a = parseFloat($("#as_"+id).value);
+  if(isNaN(h)||isNaN(a)) return showErr("Enter both scores.");
+  adminCall("set_score", {p_matchup:id, p_home:h, p_away:a});
+}
+function adminPlayers(){
+  const q = (state.adminQ||"").toLowerCase();
+  const hits = q.length<2 ? [] : LIVE.players.filter(p=>p.name.toLowerCase().includes(q)).slice(0,12);
+  const teamOpts = sel=>`<option value="">— Free agent —</option>`+Object.entries(LIVE.teamsById).sort((a,b)=>a[1].localeCompare(b[1])).map(([id,n])=>`<option value="${id}" ${+id===sel?"selected":""}>${esc(n)}</option>`).join("");
+  return `<input type="text" placeholder="Search any player (2+ letters)…" value="${esc(state.adminQ||"")}" style="width:100%"
+      oninput="state.adminQ=this.value;render();const i=document.querySelector('#adminq');i.focus();i.setSelectionRange(i.value.length,i.value.length);" id="adminq">
+    ${hits.map(p=>{ const r = LIVE.roster26.find(x=>x.player_id===p.id);
+      return `<div style="padding:10px 0;border-bottom:1px solid var(--line)">
+      <div><span class="pos ${p.pos}">${p.pos}</span> <b>${esc(p.name)}</b> ${p.active?"":'<span class="pill b">inactive</span>'} ${p.rookie?'<span class="badge">R</span>':""}
+        <span class="sm mut">· ${r?esc(LIVE.teamsById[r.team_id])+" · "+r.status+" · $"+r.salary:"free agent"}</span></div>
+      <div class="flex sm" style="margin-top:6px;flex-wrap:wrap;gap:6px">
+        NFL <select id="nfl_${p.id}">${NFL_ABBR.map(a=>`<option ${a===p.nfl_team?"selected":""}>${a}</option>`).join("")}</select>
+        List $<input type="number" id="ls_${p.id}" value="${p.salary??""}" style="width:60px">
+        <button class="btn ghost sm" onclick="adminCall('admin_set_player',{p_player:${p.id},p_nfl_team:$('#nfl_${p.id}').value,p_list_salary:+$('#ls_${p.id}').value})">Save player</button>
+      </div>
+      <div class="flex sm" style="margin-top:6px;flex-wrap:wrap;gap:6px">
+        Roster <select id="rt_${p.id}">${teamOpts(r?r.team_id:null)}</select>
+        <select id="rs_${p.id}">${["active","ir","taxi"].map(x=>`<option ${r&&r.status===x?"selected":""}>${x}</option>`).join("")}</select>
+        Salary $<input type="number" id="rsal_${p.id}" value="${r?r.salary:(p.salary??"")}" style="width:60px">
+        Contract <input type="text" id="rc_${p.id}" value="${esc(r&&r.contract||"")}" placeholder="e.g. 2, 4F" style="width:60px">
+        <button class="btn sm" onclick="adminRoster(${p.id})">Save roster</button>
+      </div></div>`; }).join("")}
+    <details style="margin-top:12px"><summary class="sm">Add a player missing from the salary list</summary>
+      <div class="flex sm" style="margin-top:8px;flex-wrap:wrap;gap:6px">
+        <input type="text" id="np_name" placeholder="Name"> <select id="np_pos">${["QB","RB","WR","TE","K","DST"].map(x=>`<option>${x}</option>`).join("")}</select>
+        <select id="np_nfl">${NFL_ABBR.map(a=>`<option>${a}</option>`).join("")}</select> $<input type="number" id="np_sal" value="2" style="width:60px">
+        <label><input type="checkbox" id="np_rk"> rookie</label>
+        <button class="btn sm" onclick="adminCall('admin_add_player',{p_name:$('#np_name').value,p_pos:$('#np_pos').value,p_nfl_team:$('#np_nfl').value,p_list_salary:+$('#np_sal').value,p_rookie:$('#np_rk').checked})">Add</button>
+      </div></details>`;
+}
+function adminRoster(pid){
+  const t = $("#rt_"+pid).value;
+  if(!t && !confirm(`Release ${LIVE.byId[pid].name} to free agency?`)) return;
+  adminCall("admin_set_roster", {p_player:pid, p_team:t?+t:null, p_status:$("#rs_"+pid).value, p_salary:+$("#rsal_"+pid).value, p_contract:$("#rc_"+pid).value});
+}
+function adminPicks(){
+  const tid = +(state.adminPickTeam || LIVE.me.team_id);
+  const teams = Object.entries(LIVE.teamsById).sort((a,b)=>a[1].localeCompare(b[1]));
+  const ps = LIVE.picks.filter(p=>p.owner_team===tid);
+  return `<div class="flex" style="margin-bottom:10px">Picks owned by <select onchange="state.adminPickTeam=this.value;render()">${teams.map(([id,n])=>`<option value="${id}" ${+id===tid?"selected":""}>${esc(n)}</option>`).join("")}</select></div>
+  <table><tr><th>Pick</th><th>Move to</th><th></th></tr>${ps.map(p=>`<tr><td>${esc(pickLabel(p,tid))}</td>
+    <td><select id="po_${p.id}">${teams.map(([id,n])=>`<option value="${id}" ${+id===tid?"selected":""}>${esc(n)}</option>`).join("")}</select></td>
+    <td><button class="btn ghost sm" onclick="adminCall('admin_set_pick',{p_pick:${p.id},p_owner:+$('#po_${p.id}').value})">Save</button></td></tr>`).join("")}</table>`;
+}
+function adminLogins(){
+  const teams = Object.entries(LIVE.teamsById).sort((a,b)=>a[1].localeCompare(b[1]));
+  const opts = sel=>teams.map(([id,n])=>`<option value="${id}" ${+id===sel?"selected":""}>${esc(n)}</option>`).join("");
+  return `<div class="sm mut" style="margin-bottom:8px">Each email can sign in and act only for its team. Changes are logged for the league. Someone moved to a different team keeps access only after they sign in again.</div>
+  <table><tr><th>Email</th><th>Team</th><th>Name</th><th>Signed in?</th><th></th></tr>
+  ${(LIVE.members||[]).sort((a,b)=>(LIVE.teamsById[a.team_id]||"").localeCompare(LIVE.teamsById[b.team_id]||"")).map((m,i)=>`<tr><td class="sm">${esc(m.email)}${m.role==="commissioner"?' <span class="pill g">commish</span>':""}</td>
+    <td><select id="mt_${i}">${opts(m.team_id)}</select></td><td><input type="text" id="mn_${i}" value="${esc(m.display_name||"")}" style="width:120px"></td>
+    <td class="sm">${m.user_id?"yes":"not yet"}</td>
+    <td style="white-space:nowrap"><button class="btn ghost sm" onclick="adminCall('admin_set_member',{p_email:'${esc(m.email)}',p_team:+$('#mt_${i}').value,p_name:$('#mn_${i}').value,p_role:'${m.role}'},reloadMembers)">Save</button>
+      ${m.role!=="commissioner"?`<button class="btn ghost sm" onclick="if(confirm('Remove ${esc(m.email)}?'))adminCall('admin_set_member',{p_email:'${esc(m.email)}',p_team:${m.team_id},p_remove:true},reloadMembers)">remove</button>`:""}</td></tr>`).join("")}
+  </table>
+  <div class="flex sm" style="margin-top:10px;flex-wrap:wrap;gap:6px">Add <input type="email" id="nm_email" placeholder="email"> <select id="nm_team">${opts(null)}</select>
+    <input type="text" id="nm_name" placeholder="name"> <button class="btn sm" onclick="adminCall('admin_set_member',{p_email:$('#nm_email').value,p_team:+$('#nm_team').value,p_name:$('#nm_name').value},reloadMembers)">Add login</button></div>`;
+}
+async function reloadMembers(){ const {data} = await sb.from("league_members").select("email,team_id,role,user_id,display_name,phone"); LIVE.members = data||[]; }
+function adminBackup(){
+  return `<div class="sm" style="margin-bottom:10px">Downloads everything in the league database as one file: rosters, salaries, picks, results, revealed bids, trades, the transaction log and the forum. Sealed bids for an open week are not included. Save it to your SacVerde folder once a week.</div>
+  <button class="btn" onclick="downloadBackup()">Download backup</button>`;
+}
+async function downloadBackup(){
+  const {data, error} = await sb.rpc("admin_export");
+  if(error) return showErr(error);
+  const blob = new Blob([JSON.stringify(data, null, 1)], {type:"application/json"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = `sacverde-backup-${new Date().toISOString().slice(0,10)}.json`; a.click();
+  flash("Backup downloaded.");
 }
 
 // ---------- header + boot ----------
