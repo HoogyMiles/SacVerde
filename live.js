@@ -18,21 +18,78 @@ function showErr(e){ state.flash = {bad:true, msg:(e && (e.message||e.error_desc
 function flash(msg){ state.flash = {bad:false,msg}; render(); }
 
 // ---------- login ----------
-function vLogin(note){
-  return `<div class="card" style="max-width:420px;margin:60px auto;text-align:center">
-    <h1 style="margin-bottom:6px">SacVerde League</h1>
-    <div class="sub" style="margin-bottom:16px">Sign in with the email the league has on file. We'll send you a one-tap login link — no password.</div>
-    ${note?`<div class="note">${note}</div>`:""}
+// Username + password. The Supabase account is <username>@users.sacverde.app (never emailed).
+// First sign-in also needs the one-time team code from the commissioner (claim_login links the account to the team).
+const UDOM = "@users.sacverde.app";
+function vLogin(note, mode){
+  mode = mode || state.loginMode || "in"; state.loginMode = mode;
+  const box = inner=>`<div class="card" style="max-width:420px;margin:60px auto;text-align:center">
+    <h1 style="margin-bottom:6px">SacVerde League</h1>${note?`<div class="note" id="loginnote">${note}</div>`:""}${inner}</div>`;
+  const inp = (id,type,ph,enter)=>`<input type="${type}" id="${id}" placeholder="${ph}" autocomplete="${type==="password"?(mode==="new"?"new-password":"current-password"):"username"}" style="width:100%;margin-bottom:10px"${enter?` onkeydown="if(event.key==='Enter')${enter}()"`:""}>`;
+  const lnk = (m,t)=>`<a onclick="state.loginMode='${m}';$('#app').innerHTML=vLogin()">${t}</a>`;
+  if(mode==="new") return box(`<div class="sub" style="margin-bottom:16px">Pick a username and password. You'll need the 6-character team code the commissioner sent you — it's only used once.</div>
+    ${inp("lu","text","Username (3–20 letters or numbers)")}${inp("lp","password","Password (6+ characters)")}${inp("lp2","password","Password again")}
+    <input type="text" id="lc" placeholder="Team code" maxlength="8" style="width:100%;margin-bottom:10px;text-transform:uppercase" onkeydown="if(event.key==='Enter')setupLogin()">
+    <button class="btn" style="width:100%" onclick="setupLogin()">Create my login</button>
+    <div class="sm" style="margin-top:12px">${lnk("in","Already set up? Sign in")}</div>`);
+  if(mode==="claim") return box(`<div class="sub" style="margin-bottom:16px">You're signed in, but this login isn't linked to a team yet. Enter the team code the commissioner sent you.</div>
+    <input type="text" id="lc" placeholder="Team code" maxlength="8" style="width:100%;margin-bottom:10px;text-transform:uppercase" onkeydown="if(event.key==='Enter')claimOnly()">
+    <button class="btn" style="width:100%" onclick="claimOnly()">Link my team</button>
+    <div class="sm" style="margin-top:12px"><a onclick="signOut()">Sign out</a></div>`);
+  if(mode==="email") return box(`<div class="sub" style="margin-bottom:16px">Only for logins already linked to an email. We'll send a one-tap link.</div>
     <input type="email" id="loginemail" placeholder="you@email.com" style="width:100%;margin-bottom:10px" onkeydown="if(event.key==='Enter')sendLink()">
     <button class="btn" style="width:100%" onclick="sendLink()">Email me a login link</button>
-  </div>`;
+    <div class="sm" style="margin-top:12px">${lnk("in","Back to username sign in")}</div>`);
+  return box(`<div class="sub" style="margin-bottom:16px">Sign in with your SacVerde username and password.</div>
+    ${inp("lu","text","Username")}${inp("lp","password","Password","signInPw")}
+    <button class="btn" style="width:100%" onclick="signInPw()">Sign in</button>
+    <div class="sm" style="margin-top:12px">${lnk("new","First time? Set up your login")} · ${lnk("email","Email link")}</div>
+    <div class="sm mut2" style="margin-top:8px">Forgot your password? Ask the commissioner to reset your login.</div>`);
+}
+function loginMsg(msg, mode){ $("#app").innerHTML = vLogin(`<b class="red">${esc(msg)}</b>`, mode); }
+function uname(){ return ($("#lu").value||"").trim().toLowerCase(); }
+let BOOTING = false, BOOT_AGAIN = false;
+async function signInPw(){ state.loginBusy = true; try{ return await _signInPw(); } finally{ state.loginBusy = false; } }
+async function _signInPw(){
+  const u = uname(), pw = $("#lp").value||""; if(!u || !pw) return;
+  const {error} = await sb.auth.signInWithPassword({email:u+UDOM, password:pw});
+  if(error) return loginMsg(/invalid/i.test(error.message) ? "Wrong username or password." : error.message, "in");
+  boot();
+}
+async function setupLogin(){ state.loginBusy = true; try{ return await _setupLogin(); } finally{ state.loginBusy = false; } }
+async function _setupLogin(){
+  const u = uname(), pw = $("#lp").value||"", pw2 = $("#lp2").value||"", code = ($("#lc").value||"").trim();
+  if(!/^[a-z0-9]{3,20}$/.test(u)) return loginMsg("Usernames are 3–20 letters or numbers (no spaces).", "new");
+  if(pw.length<6) return loginMsg("Password needs at least 6 characters.", "new");
+  if(pw!==pw2) return loginMsg("The two passwords don't match.", "new");
+  if(!code) return loginMsg("Enter your team code.", "new");
+  let {data, error} = await sb.auth.signUp({email:u+UDOM, password:pw});
+  if(error && /already|registered|exists/i.test(error.message)){
+    // finishing a setup that stopped halfway (account made, code not yet used)?
+    ({data, error} = await sb.auth.signInWithPassword({email:u+UDOM, password:pw}));
+    if(error) return loginMsg("That username is taken. Pick another.", "new");
+  } else if(error) return loginMsg(error.message, "new");
+  if(!data.session) return loginMsg("Account made, but Supabase still requires email confirmation. Commissioner: turn off \"Confirm email\" in Supabase.", "new");
+  await claimCode(code, u, "new");
+}
+async function claimOnly(){ state.loginBusy = true; try{ return await _claimOnly(); } finally{ state.loginBusy = false; } }
+async function _claimOnly(){
+  const {data:{user}} = await sb.auth.getUser();
+  await claimCode(($("#lc").value||"").trim(), (user.email||"").replace(UDOM,""), "claim");
+}
+async function claimCode(code, u, mode){
+  const {data, error} = await sb.rpc("claim_login", {p_code:code, p_username:u});
+  if(error) return loginMsg(error.message, "claim");
+  if(!data.ok) return loginMsg(data.msg, "claim");
+  state.flash = {bad:false, msg:data.msg}; state.loginMode = "in";
+  boot();
 }
 async function sendLink(){
   const email = ($("#loginemail").value||"").trim().toLowerCase(); if(!email) return;
-  const {error} = await sb.auth.signInWithOtp({email, options:{emailRedirectTo: location.origin + location.pathname}});
-  $("#app").innerHTML = vLogin(error ? `<b class="red">${esc(error.message)}</b>` : `Check <b>${esc(email)}</b> for your login link. It can take a minute — check spam too.`);
+  const {error} = await sb.auth.signInWithOtp({email, options:{emailRedirectTo: location.origin + location.pathname, shouldCreateUser:false}});
+  $("#app").innerHTML = vLogin(error ? `<b class="red">${esc(/signups not allowed|not found/i.test(error.message)?"That email isn't linked to a login. Use your username instead.":error.message)}</b>` : `Check <b>${esc(email)}</b> for your login link. It can take a minute — check spam too.`, "email");
 }
-async function signOut(){ await sb.auth.signOut(); location.reload(); }
+async function signOut(){ await sb.auth.signOut(); state.loginMode='in'; location.reload(); }
 
 // ---------- data ----------
 let ARCH = null, SEASON = 2025;
@@ -180,14 +237,14 @@ window.vMatch = function(){
 });
 async function loadAll(){
   const [{data:mem}, {data:teams}, {data:seasons}, arch, {data:mt}] = await Promise.all([
-    sb.from("league_members").select("email,team_id,role,user_id,display_name,phone"),
+    sb.from("league_members").select("email,team_id,role,user_id,login_user_id,username,display_name,phone"),
     sb.from("teams").select("id,name,division_id"),
     sb.from("seasons").select("*"),
     fetchAll(()=>sb.from("season_archive").select("season,kind,key,data").eq("season",2025)),
     sb.from("matchups").select("season,week,home_team,away_team,home_pts,away_pts").eq("season",2025).order("week")
   ]);
   const uid = (await sb.auth.getUser()).data.user.id;
-  LIVE.me = (mem||[]).find(m=>m.user_id===uid) || null;
+  LIVE.me = (mem||[]).find(m=>m.user_id===uid || m.login_user_id===uid) || null;
   if(!LIVE.me) return false;
   teams.forEach(t=>{ LIVE.teamsById[t.id]=t.name; LIVE.teamId[t.name]=t.id; });
   LIVE.season = seasons.find(s=>s.is_current);
@@ -645,7 +702,7 @@ function adminHTML(){
 async function adminCall(fn, args, after){
   const {data, error} = await sb.rpc(fn, args);
   if(error) return showErr(error);
-  await loadSeason(); if(LIVE.roster26.length) build2026(); if(after) after(data);
+  await loadSeason(); if(LIVE.roster26.length) build2026(); if(after) await after(data);
   flash(typeof data==="string" ? data : "Saved.");
 }
 function adminResults(){
@@ -789,18 +846,25 @@ function adminPicks(){
 function adminLogins(){
   const teams = Object.entries(LIVE.teamsById).sort((a,b)=>a[1].localeCompare(b[1]));
   const opts = sel=>teams.map(([id,n])=>`<option value="${id}" ${+id===sel?"selected":""}>${esc(n)}</option>`).join("");
-  return `<div class="sm mut" style="margin-bottom:8px">Each email can sign in and act only for its team. Changes are logged for the league. Someone moved to a different team keeps access only after they sign in again.</div>
-  <table><tr><th>Email</th><th>Team</th><th>Name</th><th>Signed in?</th><th></th></tr>
-  ${(LIVE.members||[]).sort((a,b)=>(LIVE.teamsById[a.team_id]||"").localeCompare(LIVE.teamsById[b.team_id]||"")).map((m,i)=>`<tr><td class="sm">${esc(m.email)}${m.role==="commissioner"?' <span class="pill g">commish</span>':""}</td>
-    <td><select id="mt_${i}">${opts(m.team_id)}</select></td><td><input type="text" id="mn_${i}" value="${esc(m.display_name||"")}" style="width:120px"></td>
-    <td class="sm">${m.user_id?"yes":"not yet"}</td>
+  if(!state.loginCodes){ sb.rpc("admin_login_codes").then(({data})=>{ state.loginCodes = {}; (data||[]).forEach(r=>state.loginCodes[r.email]=r); if(state.adminTab==="logins") render(); }); return `<div class="sm mut">Loading…</div>`; }
+  const lc = state.loginCodes;
+  return `<div class="sm" style="margin-bottom:8px">Managers sign in with a <b>username + password</b>. To set one up they tap “First time?” on the login screen and enter their <b>team code</b> (text it to them; it works once).
+    Forgot password: hit <b>Reset</b> and send the new code. To let them reuse the same username, also delete the old account in Supabase → Authentication → Users (search the username).</div>
+  <table><tr><th>Team</th><th>Email (on file)</th><th>Name</th><th>Username</th><th>Team code</th><th></th></tr>
+  ${(LIVE.members||[]).sort((a,b)=>(LIVE.teamsById[a.team_id]||"").localeCompare(LIVE.teamsById[b.team_id]||"")).map((m,i)=>{ const c = lc[m.email]||{};
+    return `<tr><td><select id="mt_${i}">${opts(m.team_id)}</select></td>
+    <td class="sm">${esc(m.email)}${m.role==="commissioner"?' <span class="pill g">commish</span>':""}${m.user_id?' <span class="sm mut" title="Can also use the email link">· email link</span>':""}</td>
+    <td><input type="text" id="mn_${i}" value="${esc(m.display_name||"")}" style="width:110px"></td>
+    <td class="sm">${m.username?`<b>${esc(m.username)}</b>`:'<span class="mut">not set up</span>'}</td>
+    <td class="sm">${c.code?`<code style="font-size:14px;letter-spacing:1px">${esc(c.code)}</code>`:'<span class="mut">used</span>'}</td>
     <td style="white-space:nowrap"><button class="btn ghost sm" onclick="adminCall('admin_set_member',{p_email:'${esc(m.email)}',p_team:+$('#mt_${i}').value,p_name:$('#mn_${i}').value,p_role:'${m.role}'},reloadMembers)">Save</button>
-      ${m.role!=="commissioner"?`<button class="btn ghost sm" onclick="if(confirm('Remove ${esc(m.email)}?'))adminCall('admin_set_member',{p_email:'${esc(m.email)}',p_team:${m.team_id},p_remove:true},reloadMembers)">remove</button>`:""}</td></tr>`).join("")}
+      ${m.username?`<button class="btn ghost sm" onclick="if(confirm('Reset the login for ${esc(m.username)}? They will need the new team code to sign up again.'))adminCall('admin_reset_login',{p_email:'${esc(m.email)}'},reloadMembers)">Reset</button>`:""}
+      ${m.role!=="commissioner"?`<button class="btn ghost sm" onclick="if(confirm('Remove ${esc(m.email)}?'))adminCall('admin_set_member',{p_email:'${esc(m.email)}',p_team:${m.team_id},p_remove:true},reloadMembers)">remove</button>`:""}</td></tr>`; }).join("")}
   </table>
   <div class="flex sm" style="margin-top:10px;flex-wrap:wrap;gap:6px">Add <input type="email" id="nm_email" placeholder="email"> <select id="nm_team">${opts(null)}</select>
     <input type="text" id="nm_name" placeholder="name"> <button class="btn sm" onclick="adminCall('admin_set_member',{p_email:$('#nm_email').value,p_team:+$('#nm_team').value,p_name:$('#nm_name').value},reloadMembers)">Add login</button></div>`;
 }
-async function reloadMembers(){ const {data} = await sb.from("league_members").select("email,team_id,role,user_id,display_name,phone"); LIVE.members = data||[]; }
+async function reloadMembers(){ const {data} = await sb.from("league_members").select("email,team_id,role,user_id,login_user_id,username,display_name,phone"); LIVE.members = data||[]; state.loginCodes = null; }
 function adminEmail(){
   const st = state.emailStatus;
   if(!st){ sb.rpc("email_status").then(({data})=>{ state.emailStatus = data || {}; if(state.adminTab==="email") render(); }); return `<div class="sm mut">Checking…</div>`; }
@@ -836,14 +900,22 @@ nav = function(){ _nav(); if(LIVE.me){ const unread = (LIVE.notes||[]).filter(n=
   `<span class="sm mut" style="margin-left:10px;white-space:nowrap"><a onclick="go('myteam')" title="Alerts">🔔${unread?` <b class="red">${unread}</b>`:""}</a> · ${esc(state.team)}${LIVE.me.role==="commissioner"?" · commish":""} · <a onclick="signOut()">sign out</a></span>`); } };
 
 async function boot(){
-  $("#app").innerHTML = `<div class="sub" style="padding:40px;text-align:center">Loading SacVerde…</div>`;
-  const {data:{session}} = await sb.auth.getSession();
-  if(!session){ $("#nav").innerHTML=""; $("#app").innerHTML = vLogin(); return; }
+  if(BOOTING){ BOOT_AGAIN = true; return; } BOOTING = true; BOOT_AGAIN = false;
   try{
+    $("#app").innerHTML = `<div class="sub" style="padding:40px;text-align:center">Loading SacVerde…</div>`;
+    const {data:{session}} = await sb.auth.getSession();
+    if(!session){ $("#nav").innerHTML=""; $("#app").innerHTML = vLogin(); return; }
     const ok = await loadAll();
-    if(!ok){ $("#nav").innerHTML=""; $("#app").innerHTML = vLogin(`That email isn't on the SacVerde league list. Ask the commissioner to add it. <a onclick="signOut()">Sign out</a>`); return; }
+    if(!ok){
+      $("#nav").innerHTML="";
+      const em = session.user && session.user.email || "";
+      $("#app").innerHTML = em.endsWith(UDOM) ? vLogin("", "claim")
+        : vLogin(`That email isn't linked to a SacVerde team. Sign in with your username instead. <a onclick="signOut()">Sign out</a>`, "in");
+      return;
+    }
     render();
   }catch(e){ $("#app").innerHTML = `<div class="note">Couldn't load league data: ${esc(e.message||e)}</div>`; }
+  finally{ BOOTING = false; if(BOOT_AGAIN) boot(); }
 }
-sb.auth.onAuthStateChange((ev)=>{ if(ev==="SIGNED_IN" && !LIVE.me) boot(); });
+sb.auth.onAuthStateChange((ev)=>{ if(ev==="SIGNED_IN" && !LIVE.me) setTimeout(()=>{ if(!LIVE.me && !state.loginBusy && !BOOTING) boot(); }, 0); });
 boot();

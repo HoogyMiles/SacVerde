@@ -7,6 +7,8 @@ $P -c "drop database if exists sv" -c "create database sv" >/dev/null
 for f in /home/claude/repo/tests/000_local_supabase_stub.sql /home/claude/repo/db/0*.sql; do $P -d sv -f $f 2>&1 | grep -i error; done
 $P -d sv <<'SQL'
 insert into auth.users (id, email) values ('00000000-0000-0000-0000-000000000001','chrishoogstad@gmail.com'),('00000000-0000-0000-0000-000000000002','chrisbadley@live.com'),('00000000-0000-0000-0000-000000000003','kaiser0505@gmail.com');
+-- 019 stopped linking accounts by email; production rows were linked before that, so link the test users the same way
+update league_members m set user_id = u.id from auth.users u where lower(u.email) = m.email and m.user_id is null;
 insert into bids (bid_week_id, team_id, player_id, amount) select 1, (select id from teams where name='Purple Reign'), id, 2 from players p join player_salaries s on s.player_id=p.id and s.season=2026 where p.active and s.list_salary=4 and p.id not in (select player_id from roster_spots) order by p.id limit 1;
 insert into bids (bid_week_id, team_id, player_id, amount) select 1, (select id from teams where name='Pool Boy'), id, 9 from players where name='Jauan Jennings' and active;
 SQL

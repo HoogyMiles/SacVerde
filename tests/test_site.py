@@ -31,13 +31,40 @@ def where(params):
         if op == "in": w.append(f"{k} in (" + ",".join(lit(x) if not x.isdigit() else x for x in val.strip("()").split(",")) + ")")
     return (" where " + " and ".join(w)) if w else ""
 
+PW = {}  # password accounts made through the mock: email -> (uid, password)
+def session_json(uid, email):
+    tok = b64({"alg": "HS256"}) + "." + b64({"sub": uid, "exp": 4102444800, "role": "authenticated"}) + ".x"
+    return {"access_token": tok, "refresh_token": "r", "token_type": "bearer", "expires_in": 3600,
+            "expires_at": 4102444800, "user": {"id": uid, "email": email, "aud": "authenticated"}}
+def token_uid(req, fallback):
+    try:
+        tok = (req.headers.get("authorization") or "").split()[-1]
+        part = tok.split(".")[1]; part += "=" * (-len(part) % 4)
+        return json.loads(base64.urlsafe_b64decode(part))["sub"]
+    except Exception: return fallback
+
 def handle(route, uid):
     req = route.request; u = urlparse(req.url); params = parse_qsl(u.query)
     path = u.path
+    uid = token_uid(req, uid)
     try:
+        if path.startswith("/auth/v1/signup"):
+            b = json.loads(req.post_data); email = b["email"].lower()
+            if email in PW or sql(f"select count(*) from auth.users where email = {lit(email)}") != "0":
+                return route.fulfill(status=422, json={"code": 422, "error_code": "user_already_exists", "msg": "User already registered"})
+            nid = sql(f"insert into auth.users (email) values ({lit(email)}) returning id")
+            PW[email] = (nid, b["password"])
+            return route.fulfill(status=200, json=session_json(nid, email))
+        if path.startswith("/auth/v1/token"):
+            b = json.loads(req.post_data or "{}"); email = (b.get("email") or "").lower()
+            if email in PW and PW[email][1] == b.get("password"):
+                return route.fulfill(status=200, json=session_json(PW[email][0], email))
+            return route.fulfill(status=400, json={"code": 400, "error_code": "invalid_credentials", "msg": "Invalid login credentials"})
         if path.startswith("/auth/v1/user"):
-            email = [e for i, e in USERS.values() if i == uid][0]
+            email = sql(f"select email from auth.users where id = {lit(uid)}")
             return route.fulfill(status=200, json={"id": uid, "email": email, "aud": "authenticated"})
+        if path.startswith("/auth/v1/logout"):
+            return route.fulfill(status=204, body="")
         if path.startswith("/auth/v1/"):
             return route.fulfill(status=200, json={})
         table = path.split("/rest/v1/")[1]
@@ -110,7 +137,27 @@ with sync_playwright() as p:
     br = p.chromium.launch()
     # 1. logged out -> login screen
     pg, errs = page_as(br, None)
-    check("logged-out visitor sees login screen", "Email me a login link" in pg.inner_text("body"))
+    check("logged-out visitor sees username login screen", "Sign in with your SacVerde username" in pg.inner_text("body") and "First time?" in pg.inner_text("body"))
+    # 1b. first-time setup with a team code, then sign out and back in with username + password
+    k2code = sql("select code from member_codes where email = 'k2smith@yahoo.com'")
+    pg.click("text=First time? Set up your login")
+    pg.fill("#lu", "K2Kings"); pg.fill("#lp", "secret123"); pg.fill("#lp2", "secret123"); pg.fill("#lc", "WRONG1"); pg.click("button:has-text('Create my login')")
+    try: pg.wait_for_function("document.body.innerText.includes('team code isn')", timeout=20000)
+    except Exception: print("LOGIN DEBUG:", pg.inner_text("body")[:500], errs)
+    check("wrong team code is rejected, account waits for a code", "Link my team" in pg.inner_text("body"))
+    pg.fill("#lc", k2code.lower()); pg.click("button:has-text('Link my team')")
+    pg.wait_for_function("document.querySelector('#nav') && document.querySelector('#nav').innerText.includes('sign out')", timeout=30000)
+    pg.wait_for_function("document.body.innerText.includes('Standings')", timeout=30000)
+    check("team code links the new username to K2's Kings", "K2's Kings" in pg.inner_text("#nav") and sql("select username from league_members where email='k2smith@yahoo.com'") == "k2kings")
+    check("code is used up", sql("select count(*) from member_codes where email = 'k2smith@yahoo.com'") == "0")
+    pg.click("#nav >> text=sign out"); pg.wait_for_selector("#lu", timeout=20000)
+    pg.fill("#lu", "k2kings"); pg.fill("#lp", "nope"); pg.click("button:has-text('Sign in')")
+    pg.wait_for_function("document.body.innerText.includes('Wrong username or password')", timeout=20000)
+    check("wrong password rejected", True)
+    pg.fill("#lu", "k2kings"); pg.fill("#lp", "secret123"); pg.click("button:has-text('Sign in')")
+    pg.wait_for_function("document.querySelector('#nav') && document.querySelector('#nav').innerText.includes('sign out')", timeout=30000)
+    check("username + password sign-in works", "K2's Kings" in pg.inner_text("#nav"))
+    check("no JS errors (login)", not errs, "; ".join(errs))
     # 2. Tritons manager
     pg, errs = page_as(br, "tritons")
     body = pg.inner_text("body")
@@ -241,6 +288,12 @@ with sync_playwright() as p:
     pg.click("button:has-text('Apply 5 checked')")
     pg.wait_for_function("document.body.innerText.includes('5 players updated')", timeout=60000)
     check("NFL Teams Apply-checked updates 5 and leaves the rest", pg.evaluate("state.nflChanges.length") == n - 5, str(n))
+    pg.evaluate("go('office'); state.adminTab='logins'; state.loginCodes=null; render()")
+    pg.wait_for_function("document.body.innerText.includes('k2kings')", timeout=20000)
+    check("Logins tab shows usernames and unused codes", "k2kings" in pg.inner_text("body") and sql("select code from member_codes where email='bret.wark@gmail.com'") in pg.inner_text("body"))
+    pg.click("tr:has-text('k2kings') button:has-text('Reset')")
+    pg.wait_for_function("document.body.innerText.includes('New team code')", timeout=20000)
+    check("Reset gives K2 a new code", sql("select (username is null)::text from league_members where email='k2smith@yahoo.com'") == "true")
     pg.evaluate("go('office'); state.adminTab='backup'; render()"); pg.wait_for_timeout(200)
     with pg.expect_download() as dl: pg.click("text=Download backup")
     check("backup downloads", dl.value.suggested_filename.startswith("sacverde-backup-"))
