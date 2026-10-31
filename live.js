@@ -638,9 +638,9 @@ async function revealWeek(id){
 const NFL_ABBR = ["ARI","ATL","BAL","BUF","CAR","CHI","CIN","CLE","DAL","DEN","DET","GB","HOU","IND","JAX","KC","LAC","LAR","LV","MIA","MIN","NE","NO","NYG","NYJ","PHI","PIT","SEA","SF","TB","TEN","WAS","FA"];
 function adminHTML(){
   const tab = state.adminTab || "results";
-  const tabs = [["results","Scores"],["players","Players & Rosters"],["picks","Draft Picks"],["logins","Logins"],["email","Email"],["backup","Backup"]];
+  const tabs = [["results","Scores"],["players","Players & Rosters"],["nfl","NFL Teams"],["picks","Draft Picks"],["logins","Logins"],["email","Email"],["backup","Backup"]];
   return `<div class="tabs">${tabs.map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="state.adminTab='${k}';render()">${l}</button>`).join("")}</div>
-  <div class="card">${({results:adminResults, players:adminPlayers, picks:adminPicks, logins:adminLogins, email:adminEmail, backup:adminBackup})[tab]()}</div>`;
+  <div class="card">${({results:adminResults, players:adminPlayers, nfl:adminNfl, picks:adminPicks, logins:adminLogins, email:adminEmail, backup:adminBackup})[tab]()}</div>`;
 }
 async function adminCall(fn, args, after){
   const {data, error} = await sb.rpc(fn, args);
@@ -699,6 +699,83 @@ function adminRoster(pid){
   const t = $("#rt_"+pid).value;
   if(!t && !confirm(`Release ${LIVE.byId[pid].name} to free agency?`)) return;
   adminCall("admin_set_roster", {p_player:pid, p_team:t?+t:null, p_status:$("#rs_"+pid).value, p_salary:+$("#rsal_"+pid).value, p_contract:$("#rc_"+pid).value});
+}
+// ---- NFL Teams: compare the daily NFL roster snapshot (/nfl_rosters.json) with the salary list ----
+const NFL_GONE = {CUT:"released", RET:"retired"};
+const NFL_STAT = {ACT:"active", DEV:"practice squad", RES:"reserve/IR", INA:"inactive", CUT:"released", RET:"retired"};
+function nflNorm(n){ return String(n||"").normalize("NFKD").replace(/[̀-ͯ]/g,"").toLowerCase()
+  .replace(/[.'’\-]/g," ").replace(/\b(jr|sr|ii|iii|iv|v)\b/g,"").replace(/\s+/g,""); }
+function nflDiff(){
+  const snap = state.nflSnap; const idx = {};
+  snap.players.forEach(r=>{ (idx[nflNorm(r.n)+"|"+r.p] = idx[nflNorm(r.n)+"|"+r.p] || []).push(r); });
+  const out = {change:[], missing:[], ambig:[], same:0};
+  LIVE.players.filter(p=>p.active && p.pos!=="DST").forEach(p=>{
+    let c = idx[nflNorm(p.name)+"|"+p.pos];
+    if(!c){ out.missing.push(p); return; }
+    if(c.length>1){ const live = c.filter(x=>x.t!=="FA"); if(live.length!==1){ out.ambig.push({p, c}); return; } c = live; }
+    const r = c[0];
+    if(r.t===p.nfl_team) out.same++; else out.change.push({p, r});
+  });
+  const own = p=>{ const x = LIVE.roster26.find(s=>s.player_id===p.id); return x ? LIVE.teamsById[x.team_id] : ""; };
+  const sortKey = x=>(own(x.p||x)?"0":"1")+(x.p||x).name;
+  out.change.sort((a,b)=>sortKey(a).localeCompare(sortKey(b)));
+  out.missing.sort((a,b)=>sortKey(a).localeCompare(sortKey(b)));
+  out.own = own; return out;
+}
+function adminNfl(){
+  if(state.nflSnap===undefined){
+    state.nflSnap = null;
+    fetch("/nfl_rosters.json", {cache:"no-store"}).then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+      .then(d=>{ state.nflSnap = d; state.nflSkip = {}; if(state.adminTab==="nfl") render(); })
+      .catch(e=>{ state.nflSnap = {error:String(e.message||e)}; if(state.adminTab==="nfl") render(); });
+  }
+  const snap = state.nflSnap;
+  if(!snap) return `<div class="sm mut">Loading NFL rosters…</div>`;
+  if(snap.error) return `<div class="note" style="border-color:var(--red)">⚠️ Couldn't load the NFL roster file (${esc(snap.error)}).</div>`;
+  const d = nflDiff(); state.nflChanges = d.change;
+  const ageH = (Date.now() - Date.parse(snap.updated.replace(" UTC","Z").replace(" ","T")))/36e5;
+  const skip = state.nflSkip || {};
+  const nChecked = d.change.filter(x=>!skip[x.p.id]).length;
+  const row = x=>{ const o = d.own(x.p); const gone = NFL_GONE[x.r.s];
+    return `<tr${o?' style="font-weight:600"':""}><td><input type="checkbox" ${skip[x.p.id]?"":"checked"} onchange="state.nflSkip[${x.p.id}]=!this.checked;render()"></td>
+      <td><span class="pos ${x.p.pos}">${x.p.pos}</span> ${esc(x.p.name)}</td><td class="sm">${o?esc(o):'<span class="mut">—</span>'}</td>
+      <td>${esc(x.p.nfl_team||"")} → <b${gone?' class="red"':""}>${esc(x.r.t)}</b></td>
+      <td class="sm mut">${esc(NFL_STAT[x.r.s]||x.r.s)}${x.r.w?" · wk "+x.r.w:""}</td>
+      <td><button class="btn ghost sm" onclick="nflApply([${x.p.id}])">Apply</button></td></tr>`; };
+  return `<div class="sm" style="margin-bottom:10px">Compares every player on the salary list with the NFL's current rosters (nflverse, refreshed daily).
+      Snapshot: <b>${esc(snap.updated)}</b>${ageH>48?` <span class="pill r">over ${Math.floor(ageH/24)} days old — the daily update may not be running</span>`:""}.
+      Only the NFL team changes; salaries never change. Bold rows are on a league roster.</div>
+    <div class="sm mut" style="margin-bottom:10px">${d.same} match · ${d.change.length} changed · ${d.missing.length} not found · ${d.ambig.length} unclear</div>
+    ${d.change.length?`<div class="flex" style="margin-bottom:8px;gap:8px"><button class="btn" ${nChecked?"":"disabled"} onclick="nflApply(state.nflChanges.filter(x=>!state.nflSkip[x.p.id]).map(x=>x.p.id))">Apply ${nChecked} checked</button>
+      <a class="sm" onclick="state.nflSkip={};render()">check all</a> · <a class="sm" onclick="state.nflChanges.forEach(x=>state.nflSkip[x.p.id]=true);render()">uncheck all</a></div>
+    <table><tr><th></th><th>Player</th><th>League team</th><th>NFL team</th><th>NFL status</th><th></th></tr>${d.change.map(row).join("")}</table>`
+    :`<div class="note">✅ Every matched player's NFL team is up to date.</div>`}
+    ${d.missing.length?`<details style="margin-top:12px"><summary class="sm">Not on any NFL roster in the snapshot (${d.missing.length}) — unsigned, or the name is spelled differently</summary>
+      <table style="margin-top:6px"><tr><th>Player</th><th>League team</th><th>List NFL team</th><th></th></tr>${d.missing.map(p=>{ const o = d.own(p);
+        return `<tr${o?' style="font-weight:600"':""}><td><span class="pos ${p.pos}">${p.pos}</span> ${esc(p.name)}</td><td class="sm">${o?esc(o):"—"}</td><td>${esc(p.nfl_team||"")}</td>
+        <td>${p.nfl_team!=="FA"?`<button class="btn ghost sm" onclick="nflApply([${p.id}],'FA')">Set FA</button>`:""}</td></tr>`; }).join("")}</table></details>`:""}
+    ${d.ambig.length?`<details style="margin-top:8px"><summary class="sm">Same name on more than one NFL team (${d.ambig.length}) — fix by hand in Players & Rosters</summary>
+      <table style="margin-top:6px">${d.ambig.map(a=>`<tr><td><span class="pos ${a.p.pos}">${a.p.pos}</span> ${esc(a.p.name)}</td><td>${esc(a.p.nfl_team||"")}</td>
+        <td class="sm mut">${a.c.map(r=>esc(r.t)+" ("+esc(NFL_STAT[r.s]||r.s)+")").join(", ")}</td></tr>`).join("")}</table></details>`:""}`;
+}
+async function nflApply(ids, forceTeam){
+  const d = nflDiff(); const want = {};
+  d.change.forEach(x=>want[x.p.id]=x.r.t);
+  const jobs = ids.map(id=>({id, team: forceTeam || want[id]})).filter(j=>j.team);
+  if(!jobs.length) return;
+  if(jobs.length>1 && !confirm(`Update the NFL team for ${jobs.length} players?`)) return;
+  let done = 0; const fails = [];
+  for(let i=0; i<jobs.length; i+=8){
+    await Promise.all(jobs.slice(i,i+8).map(async j=>{
+      const p = LIVE.byId[j.id];
+      const {error} = await sb.rpc("admin_set_player", {p_player:j.id, p_nfl_team:j.team, p_list_salary:p.salary});
+      if(error) fails.push(p.name+": "+error.message); else done++;
+    }));
+    if(jobs.length>8){ state.flash = {bad:false, msg:`Updating… ${done}/${jobs.length}`}; render(); }
+  }
+  await loadSeason(); if(LIVE.roster26.length) build2026();
+  if(fails.length) showErr(`${done} updated. ${fails.length} failed: ${fails.slice(0,3).join("; ")}`);
+  else flash(jobs.length===1 ? `${LIVE.byId[jobs[0].id].name} → ${jobs[0].team}.` : `${done} players updated.`);
 }
 function adminPicks(){
   const tid = +(state.adminPickTeam || LIVE.me.team_id);
