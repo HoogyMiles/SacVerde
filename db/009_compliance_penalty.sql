@@ -16,6 +16,7 @@ create table if not exists public.penalties (
   active      int,
   cap_used    int,
   dropped     jsonb not null default '[]',     -- [{player_id, name, salary}]
+  pending     jsonb not null default '[]',     -- forced drops deferred because the player's game had started
   applied_in_yahoo boolean not null default false,
   created_at  timestamptz not null default now(),
   unique (season, week, team_id)
@@ -24,6 +25,7 @@ create table if not exists public.compliance_runs (
   season int not null, week int not null, ran_at timestamptz not null default now(),
   primary key (season, week)
 );
+alter table public.penalties add column if not exists pending jsonb not null default '[]';  -- for re-runs
 alter table public.penalties enable row level security;
 alter table public.compliance_runs enable row level security;
 drop policy if exists "members read" on public.penalties;
@@ -42,13 +44,13 @@ create or replace function public.enforce_compliance_for(p_season int, p_week in
 returns int
 language plpgsql security definer set search_path = public as $$
 declare
-  s public.seasons; c record; n int := 0; dropped jsonb; r record;
+  s public.seasons; c record; n int := 0; dropped jsonb; pend jsonb; r record;
 begin
   select * into s from public.seasons where year = p_season;
   if exists (select 1 from public.compliance_runs where season = p_season and week = p_week) then return 0; end if;
 
   for c in select * from public.team_compliance(p_season) where over_roster > 0 or over_cap > 0 loop
-    dropped := '[]';
+    dropped := '[]'; pend := '[]';
     -- players acquired this cycle that are still on the roster
     for r in
       select distinct on (rs.player_id) rs.id spot_id, rs.player_id, rs.salary, p.name
@@ -58,6 +60,11 @@ begin
        where t.season = p_season and t.team_id = c.team_id and t.kind in ('add', 'trade_in')
          and t.created_at >= p_since
     loop
+      -- A player whose game has started is locked to the roster for the week: drop him when the week ends
+      if public.player_locked(r.player_id, p_season, p_week) then
+        pend := pend || jsonb_build_object('player_id', r.player_id, 'name', r.name, 'salary', r.salary);
+        continue;
+      end if;
       delete from public.roster_spots where id = r.spot_id;
       insert into public.transactions (season, week, kind, team_id, player_id, amount, details)
       values (p_season, p_week, 'forced_drop', c.team_id, r.player_id, r.salary,
@@ -65,17 +72,40 @@ begin
       dropped := dropped || jsonb_build_object('player_id', r.player_id, 'name', r.name, 'salary', r.salary);
     end loop;
 
-    insert into public.penalties (season, week, team_id, kind, active, cap_used, dropped)
-    values (p_season, p_week, c.team_id, 'forfeit', c.active, c.cap_used, dropped);
+    insert into public.penalties (season, week, team_id, kind, active, cap_used, dropped, pending)
+    values (p_season, p_week, c.team_id, 'forfeit', c.active, c.cap_used, dropped, pend);
     insert into public.transactions (season, week, kind, team_id, details)
     values (p_season, p_week, 'forfeit', c.team_id,
             jsonb_build_object('active', c.active, 'cap_used', c.cap_used, 'over_roster', c.over_roster,
-                               'over_cap', c.over_cap, 'dropped', dropped));
+                               'over_cap', c.over_cap, 'dropped', dropped, 'deferred', pend));
     n := n + 1;
   end loop;
 
   insert into public.compliance_runs (season, week) values (p_season, p_week);
   return n;
+end $$;
+
+-- Deferred forced drops: once the penalty week is over, drop the locked players
+create or replace function public.process_deferred_drops() returns void
+language plpgsql security definer set search_path = public as $$
+declare pen record; d jsonb; yr int := public.current_season(); lw int; done jsonb;
+begin
+  if yr is null then return; end if;
+  lw := public.league_week(yr);
+  for pen in select * from public.penalties where season = yr and week < lw and pending <> '[]'::jsonb loop
+    done := '[]';
+    for d in select * from jsonb_array_elements(pen.pending) loop
+      delete from public.roster_spots
+       where season = yr and team_id = pen.team_id and player_id = (d->>'player_id')::int;
+      if found then
+        insert into public.transactions (season, week, kind, team_id, player_id, amount, details)
+        values (yr, lw, 'forced_drop', pen.team_id, (d->>'player_id')::int, (d->>'salary')::int,
+                jsonb_build_object('reason', 'deferred penalty drop from week ' || pen.week));
+      end if;
+      done := done || d;
+    end loop;
+    update public.penalties set dropped = dropped || done, pending = '[]' where id = pen.id;
+  end loop;
 end $$;
 
 -- Scheduler entry point: enforce the current week once its Sunday 9:55am PT deadline passes
@@ -84,6 +114,7 @@ language plpgsql security definer set search_path = public as $$
 declare yr int := public.current_season(); lw int; dl timestamptz; prev timestamptz;
 begin
   if yr is null then return; end if;
+  perform public.process_deferred_drops();
   lw := public.league_week(yr);
   dl := public.compliance_deadline(yr, lw);
   if dl is null or now() < dl then return; end if;
@@ -91,7 +122,7 @@ begin
   perform public.enforce_compliance_for(yr, lw, prev);
 end $$;
 
-revoke execute on function public.enforce_compliance_for(int,int,timestamptz), public.enforce_compliance() from public, anon, authenticated;
+revoke execute on function public.enforce_compliance_for(int,int,timestamptz), public.enforce_compliance(), public.process_deferred_drops() from public, anon, authenticated;
 
 -- Hook into the 5-minute scheduler
 create or replace function public.auto_reveal() returns void
