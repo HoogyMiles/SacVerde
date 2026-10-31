@@ -301,7 +301,8 @@ function complianceBanner(teamId){
 function complianceCard(){
   const bad = (LIVE.compliance||[]).filter(c=>c.over_roster||c.over_cap);
   return `<div class="card"><h3>Roster & Cap Compliance</h3>
-    <div class="sm mut" style="margin-bottom:8px">Teams may be over until <b>${LIVE.deadline?fmtPT(LIVE.deadline):"Sunday 9:55 AM PT"}</b>.</div>
+    <div class="sm mut" style="margin-bottom:8px">Teams may be over until <b>${LIVE.deadline?fmtPT(LIVE.deadline):"Sunday 9:55 AM PT"}</b>.
+      ${LIVE.season.enforce_penalties===false?'<span class="pill b">TEST MODE — penalties are not applied</span>':""}</div>
     ${bad.length?`<table><tr><th>Team</th><th class="r">Active</th><th class="r">Cap used</th><th>Issue</th></tr>${bad.map(c=>`<tr><td>${esc(c.team)}</td><td class="r">${c.active}</td><td class="r">${money(c.cap_used)}</td>
       <td class="red sm">${[c.over_roster?`+${c.over_roster} roster`:"", c.over_cap?`$${c.over_cap} over cap`:""].filter(Boolean).join(" · ")}</td></tr>`).join("")}</table>`
       :`<div class="sm grn">All teams are legal.</div>`}
