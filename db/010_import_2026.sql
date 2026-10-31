@@ -3,7 +3,7 @@
 -- Sources: SacVerdeLeague2026.xlsx (team sheets, results, trades), 2026_SalaryList.xlsx (official list)
 -- Run AFTER 009. Safe to re-run (every step checks what already exists).
 -- =====================================================================
-create schema if not exists sv_import;   -- private staging area (not exposed to the website)
+-- staging tables live in public with row level security ON and no policies (website cannot read them); dropped at the end
 -- names + divisions for 2026
 update public.teams set name = 'Purple Reign' where name = 'Tritons';
 update public.divisions set name = 'Sailgating Syndicate' where name = 'Deez Knutes';
@@ -27,8 +27,10 @@ insert into public.league_members (email, team_id, display_name, phone, role) se
 insert into public.league_members (email, team_id, display_name, phone, role) select 'spandexboy@hotmail.com', id, 'Scott Greensides', '(831) 521-2725', 'manager' from public.teams where name = 'Assassins' on conflict (email) do update set team_id = excluded.team_id, display_name = excluded.display_name, phone = coalesce(excluded.phone, public.league_members.phone);
 insert into public.transactions (season, kind, details) values (2026, 'member_import', '{"source":"2026 team sheets"}');
 -- official 2026 salary list: update existing players, add new ones, retire the rest
-drop table if exists sv_import.off26; create table sv_import.off26 (name text, pos text, nfl text, rookie boolean, sal int);
-insert into sv_import.off26 values
+drop table if exists public._sv_off26;
+create table public._sv_off26 (name text, pos text, nfl text, rookie boolean, sal int);
+alter table public._sv_off26 enable row level security;
+insert into public._sv_off26 values
  ('Ja''Marr Chase','WR','CIN',false,40),
  ('Jahmyr Gibbs','RB','DET',false,40),
  ('Bijan Robinson','RB','ATL',false,39),
@@ -1138,21 +1140,25 @@ insert into sv_import.off26 values
  ('Travis Hunter','WR','JAX',false,2),
  ('Najee Harris','RB','NYG',false,2),
  ('Darren Waller','TE','CAR',false,2);
-drop table if exists sv_import.pmap; create table sv_import.pmap as
+drop table if exists public._sv_pmap;
+create table public._sv_pmap as
   select o.*, (select p.id from public.players p
                 where regexp_replace(lower(regexp_replace(p.name,'\m(jr|sr|ii|iii|iv)\M\.?','','gi')),'[^a-z0-9]','','g')
                     = regexp_replace(lower(regexp_replace(o.name,'\m(jr|sr|ii|iii|iv)\M\.?','','gi')),'[^a-z0-9]','','g')
                   and (p.pos = o.pos or (o.pos = 'K' and p.pos = 'P'))
                 order by (p.nfl_team = o.nfl) desc, p.id limit 1) as pid
-  from sv_import.off26 o;
-update public.players p set name = m.name, pos = m.pos, nfl_team = m.nfl, rookie = m.rookie, active = true from sv_import.pmap m where p.id = m.pid;
-with ins as (insert into public.players (name, pos, nfl_team, rookie) select name, pos, nfl, rookie from sv_import.pmap where pid is null returning id, name, pos) update sv_import.pmap m set pid = ins.id from ins where m.pid is null and ins.name = m.name and ins.pos = m.pos;
-update public.players set active = false where id not in (select pid from sv_import.pmap where pid is not null);
-delete from public.player_salaries s where season = 2026 and player_id not in (select pid from sv_import.pmap where pid is not null) and not exists (select 1 from public.bids b where b.player_id = s.player_id);
-insert into public.player_salaries (season, player_id, list_salary) select 2026, pid, sal from sv_import.pmap on conflict (season, player_id) do update set list_salary = excluded.list_salary;
+  from public._sv_off26 o;
+alter table public._sv_pmap enable row level security;
+update public.players p set name = m.name, pos = m.pos, nfl_team = m.nfl, rookie = m.rookie, active = true from public._sv_pmap m where p.id = m.pid;
+with ins as (insert into public.players (name, pos, nfl_team, rookie) select name, pos, nfl, rookie from public._sv_pmap where pid is null returning id, name, pos) update public._sv_pmap m set pid = ins.id from ins where m.pid is null and ins.name = m.name and ins.pos = m.pos;
+update public.players set active = false where id not in (select pid from public._sv_pmap where pid is not null);
+delete from public.player_salaries s where season = 2026 and player_id not in (select pid from public._sv_pmap where pid is not null) and not exists (select 1 from public.bids b where b.player_id = s.player_id);
+insert into public.player_salaries (season, player_id, list_salary) select 2026, pid, sal from public._sv_pmap on conflict (season, player_id) do update set list_salary = excluded.list_salary;
 -- 2026 rosters (team sheets + Oct 30-31 trades from the TRADES tab)
-drop table if exists sv_import.r26; create table sv_import.r26 (team text, name text, pos text, status text, salary int, contract text, ir int, via text);
-insert into sv_import.r26 values
+drop table if exists public._sv_r26;
+create table public._sv_r26 (team text, name text, pos text, status text, salary int, contract text, ir int, via text);
+alter table public._sv_r26 enable row level security;
+insert into public._sv_r26 values
  ('Rhin-Owned','Pat Bryant','WR','ir',3,null,6,'keeper'),
  ('Rhin-Owned','Davante Adams','WR','ir',18,'3',8,'keeper'),
  ('Rhin-Owned','Joe Burrow','QB','active',18,'5F',null,'keeper'),
@@ -1400,7 +1406,7 @@ insert into sv_import.r26 values
  ('Assassins','Kaleb Johnson','RB','taxi',18,null,null,'keeper');
 insert into public.roster_spots (season, team_id, player_id, status, salary, contract, acquired_via, ir_since_week)
   select 2026, t.id, m.pid, r.status, r.salary, r.contract, case when r.via = 'trade' then 'trade' else 'keeper' end, r.ir
-    from sv_import.r26 r join public.teams t on t.name = r.team join sv_import.pmap m on m.name = r.name and m.pos = r.pos
+    from public._sv_r26 r join public.teams t on t.name = r.team join public._sv_pmap m on m.name = r.name and m.pos = r.pos
   on conflict (season, player_id) do update set team_id = excluded.team_id, status = excluded.status, salary = excluded.salary,
      contract = excluded.contract, acquired_via = excluded.acquired_via, ir_since_week = excluded.ir_since_week;
 -- 2026 results, weeks 1-7
@@ -1546,4 +1552,4 @@ insert into public.standings (season, week, team_id, rank, wins, losses, ties, p
 insert into public.standings (season, week, team_id, rank, wins, losses, ties, pf) select 2026, 7, id, 12, 0, 7, 0, 605.28 from public.teams where name = 'Milky Wet Hogs';
 update public.seasons set current_week = public.league_week(2026) where year = 2026;
 insert into public.transactions (season, kind, details) values (2026, 'season_import', '{"source":"SacVerdeLeague2026.xlsx + 2026_SalaryList.xlsx"}');
-drop schema sv_import cascade;   -- clean up staging
+drop table if exists public._sv_off26, public._sv_pmap, public._sv_r26;   -- clean up staging
