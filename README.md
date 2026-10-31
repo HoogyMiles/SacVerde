@@ -7,3 +7,4 @@ League site for SacVerde fantasy football: salaries, $170 cap, sealed Tuesday bl
   - 001 schema · 002 security · 003 league seed · 004 2025 history · 005 bidding engine · 006 2026 NFL schedule · 007 fixes · 008 cap/roster grace period · 009 compliance penalty · 010 2026 season import · 011 penalty on/off switch · 012 Curtain trade salaries · 013 IR, taxi, trades · 014 draft picks · 015 results + standings · 016 admin tools · 017 sheet transaction history · 018 alerts + email
 - `tests/` — local-only tests (security, engine, full browser). Never run `000_local_supabase_stub.sql` in Supabase.
 - `tools/` — scripts that built 010 from the league Google Sheets (parse, standings, FA replay).
+- `HANDOFF.md` — build status, rules as built, open items, next steps (start here in a new session).
