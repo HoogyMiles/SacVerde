@@ -35,6 +35,64 @@ async function sendLink(){
 async function signOut(){ await sb.auth.signOut(); location.reload(); }
 
 // ---------- data ----------
+let ARCH = null, SEASON = 2025;
+// Turn live 2026 rows into the shape the original views expect
+function build2026(){
+  const yr = LIVE.season.year, byId = LIVE.teamsById, divName = {}; LIVE.divs.forEach(d=>divName[d.id]=d.name);
+  const teamDiv = {}; LIVE.teamRows.forEach(t=>teamDiv[t.name]=divName[t.division_id]);
+  const rec = {}; Object.values(byId).forEach(n=>rec[n]={w:0,l:0,t:0,dw:0,dl:0,dt:0,pf:0,pa:0,sched:[]});
+  const weeks = {};
+  LIVE.m26.forEach(m=>{
+    const h=byId[m.home_team], a=byId[m.away_team], hs=+m.home_pts, as=+m.away_pts;
+    (weeks[m.week]=weeks[m.week]||[]).push({home:h, hs, away:a, as});
+    [[h,hs,a,as],[a,as,h,hs]].forEach(([me,ms,op,os])=>{
+      const r=rec[me], k = ms>os?"w":ms<os?"l":"t"; r[k]++; r.pf+=ms; r.pa+=os;
+      if(teamDiv[me]===teamDiv[op]) r["d"+k]++;
+      r.sched.push({week:String(m.week), opp:op.toUpperCase(), result:k.toUpperCase(), pf:ms, pa:os});
+    });
+  });
+  const latest = Math.max(-1, ...Object.keys(LIVE.standings).map(Number));
+  const rankOf = LIVE.standings[latest] || {};
+  const ord = n=>{const s=["th","st","nd","rd"], v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]);};
+  const divisions = {};
+  Object.values(byId).forEach(n=>{ const d=teamDiv[n]; (divisions[d]=divisions[d]||[]).push(n); });
+  Object.keys(divisions).forEach(d=>{
+    divisions[d] = divisions[d].sort((a,b)=>(rankOf[LIVE.teamId[a]]||99)-(rankOf[LIVE.teamId[b]]||99))
+      .map((n,i)=>({rank:i+1, team:n, w:String(rec[n].w), l:String(rec[n].l), t:String(rec[n].t), dw:String(rec[n].dw), dl:String(rec[n].dl), dt:String(rec[n].dt), pts:rec[n].pf}));
+  });
+  const teams = {};
+  Object.values(byId).forEach(n=>{
+    const tid = LIVE.teamId[n], arch = ARCH.DATA.teams[n] || ARCH.DATA.teams[n==="Purple Reign"?"Tritons":n] || {};
+    const spots = LIVE.roster26.filter(r=>r.team_id===tid).map(r=>{const p=LIVE.byId[r.player_id]||{};
+      return {pos:p.pos, name:p.name, nfl:p.nfl_team, salary:r.salary, contract:r.contract, status:r.status};});
+    const gp = rec[n].w+rec[n].l+rec[n].t, owner = LIVE.members.find(m=>m.team_id===tid);
+    const divRank = (divisions[teamDiv[n]].find(x=>x.team===n)||{}).rank;
+    teams[n] = {
+      name:n, roster:spots.filter(x=>x.status==="active"), taxi:spots.filter(x=>x.status==="taxi"), ir:spots.filter(x=>x.status==="ir"),
+      schedule:rec[n].sched, transactions:[], picks:{"2026":[], "2027":[]},
+      info:{owners: owner&&owner.display_name, division:teamDiv[n], record:[String(rec[n].w),String(rec[n].l),String(rec[n].t)],
+            div_record:[String(rec[n].dw),String(rec[n].dl),String(rec[n].dt)], pf:rec[n].pf.toFixed(2), pa:rec[n].pa.toFixed(2),
+            ppg: gp?(rec[n].pf/gp).toFixed(2):"-", standing: divRank?ord(divRank):""},
+      history: (()=>{ const h = {...(arch.history||{})};
+        if(h.all_time) h.all_time = [String(+h.all_time[0]+rec[n].w), String(+h.all_time[1]+rec[n].l), String(+(h.all_time[2]||0)+rec[n].t)];
+        if(h.all_time_div) h.all_time_div = [String(+h.all_time_div[0]+rec[n].dw), String(+h.all_time_div[1]+rec[n].dl), String(+(h.all_time_div[2]||0)+rec[n].dt)];
+        return h; })(),
+      total_salary: capInfo(tid).used, taxi_salary: spots.filter(x=>x.status==="taxi").reduce((s,x)=>s+x.salary,0)
+    };
+  });
+  const owner = {}; LIVE.roster26.forEach(r=>owner[r.player_id]=byId[r.team_id]);
+  DATA = {teams, divisions, weeks, salary_list: LIVE.players.filter(p=>p.active && p.salary!=null)
+            .map(p=>({name:p.name, nfl:p.nfl_team, pos:p.pos, rookie:p.rookie, salary:p.salary, owner:owner[p.id]||null}))};
+  TEAMS = Object.keys(teams).sort();
+  SEASON = yr;
+  state.week = Math.max(1, ...Object.keys(weeks).map(Number));
+}
+// Views that show the 2025 archive keep using it
+["vHistory","vFinancials","vDraft"].forEach(fn=>{
+  const orig = window[fn];
+  window[fn] = function(){ if(!ARCH || SEASON===2025) return orig(); const d=DATA, t=TEAMS; DATA=ARCH.DATA; TEAMS=ARCH.TEAMS;
+    try{ return orig(); } finally { DATA=d; TEAMS=t; } };
+});
 async function loadAll(){
   const [{data:mem}, {data:teams}, {data:seasons}, arch, {data:mt}] = await Promise.all([
     sb.from("league_members").select("email,team_id,role,user_id,display_name"),
@@ -62,6 +120,9 @@ async function loadAll(){
   state.team = LIVE.teamsById[LIVE.me.team_id]; state.bidTeam = state.team; state.forumAs = state.team;
 
   await loadSeason();
+  ARCH = {DATA, TEAMS:[...TEAMS], DRAFT_DATA};
+  LIVE.members = mem||[];
+  if(LIVE.roster26.length) build2026();
   await loadForum();
   return true;
 }
@@ -88,6 +149,11 @@ async function loadSeason(){
     const {data} = await sb.from("bids").select("player_id,amount,updated_at").eq("bid_week_id",LIVE.bidWeek.id).eq("team_id",LIVE.me.team_id);
     (data||[]).forEach(b=>LIVE.myBids[b.player_id]=b);
   }
+  const [m26, divs, tms] = await Promise.all([
+    sb.from("matchups").select("week,home_team,away_team,home_pts,away_pts").eq("season",yr).order("week"),
+    sb.from("divisions").select("id,name"),
+    sb.from("teams").select("id,name,division_id")]);
+  LIVE.m26 = m26.data||[]; LIVE.divs = divs.data||[]; LIVE.teamRows = tms.data||[];
   const comp = await sb.rpc("team_compliance", {p_season: yr});
   LIVE.compliance = comp.data || [];
   const dl = await sb.rpc("compliance_deadline", {p_season: yr, p_week: LIVE.season.current_week});
@@ -189,6 +255,7 @@ async function withdrawBid(pid){
 function revealHTML(){
   const w = LIVE.lastRevealed;
   if(!w) return `<div class="note">No week has been revealed yet.</div>`;
+  if(!LIVE.revealed) return `<div class="note">Loading…</div>`;
   const by = {}; LIVE.revealed.forEach(b=>(by[b.player_id]=by[b.player_id]||[]).push(b));
   const now = new Date(), me = LIVE.me.team_id;
   const rostered = new Set(LIVE.roster26.map(r=>r.player_id));

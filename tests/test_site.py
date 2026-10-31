@@ -3,7 +3,7 @@ from urllib.parse import urlparse, parse_qsl
 from playwright.sync_api import sync_playwright
 
 PSQL = ["psql", "-h", "/tmp/pg", "-p", "5433", "-U", "postgres", "-d", "sv", "-tA", "-v", "ON_ERROR_STOP=1", "-q"]
-USERS = {"tritons": ("00000000-0000-0000-0000-000000000002", "paulbstephens@hotmail.com"),
+USERS = {"tritons": ("00000000-0000-0000-0000-000000000002", "chrisbadley@live.com"),
          "hoogy":   ("00000000-0000-0000-0000-000000000001", "chrishoogstad@gmail.com"),
          "pool":    ("00000000-0000-0000-0000-000000000003", "kaiser0505@gmail.com")}
 
@@ -94,7 +94,9 @@ def page_as(br, who):
     pg = ctx.new_page(); errs = []
     pg.on("pageerror", lambda e: errs.append(str(e)))
     pg.on("dialog", lambda d: d.accept())
-    pg.goto("http://localhost:8080/index.html"); pg.wait_for_timeout(1500)
+    pg.goto("http://localhost:8080/index.html")
+    if who: pg.wait_for_function("document.querySelector('#nav') && document.querySelector('#nav').innerText.includes('sign out')", timeout=30000)
+    pg.wait_for_timeout(500)
     return pg, errs
 
 results = []
@@ -110,7 +112,7 @@ with sync_playwright() as p:
     pg, errs = page_as(br, "tritons")
     body = pg.inner_text("body")
     check("Tritons home loads 2025 champion + standings", "Alligator Arms" in body and "Standings" in body, body[:300])
-    check("header shows signed-in team", "Tritons · sign out" in pg.inner_text("#nav"))
+    check("header shows signed-in team", "Purple Reign · sign out" in pg.inner_text("#nav"))
     pg.evaluate("go('bids')"); pg.wait_for_timeout(500)
     body = pg.inner_text("body")
     check("bid room shows auto-opened week 9 closing Tue 9pm PT", "Week 9 bids close Tue, Nov 3, 9:00 PM PT" in body, body[:500])
@@ -125,7 +127,15 @@ with sync_playwright() as p:
     pg.fill("#chatmsg", "Testing the new forum 🔥"); pg.click("text=Send"); pg.wait_for_timeout(800)
     check("forum post saved", "Testing the new forum" in pg.inner_text("#chatlog"))
     pg.screenshot(path="/home/claude/e2e/forum.png")
-    check("no JS errors (Tritons)", not errs, "; ".join(errs))
+    check("no JS errors (Purple Reign)", not errs, "; ".join(errs))
+    pg.evaluate("go('teams'); state.team='Steel Curtain'; render()"); pg.wait_for_timeout(400)
+    body = pg.inner_text("body")
+    check("Teams page shows 2026 roster + record (Curtain 4-3, Derrick Henry, $212)", "2026 RECORD" in body.upper() and "4-3" in body and "Derrick Henry" in body and "$212" in body, body[:1200])
+    pg.evaluate("go('home')"); pg.wait_for_timeout(400)
+    body = pg.inner_text("body")
+    check("Home shows 2026 divisions", "Sailgating Syndicate" in body and "Thunderdome" in body, body[:800])
+    pg.evaluate("go('history')"); pg.wait_for_timeout(400)
+    check("History still shows the 2025 archive", "Alligator Arms" in pg.inner_text("body") and not errs, "; ".join(errs))
     # 3. Commissioner cannot see Tritons' bids; sees commissioner tools
     pg, errs = page_as(br, "hoogy")
     pg.evaluate("go('office')"); pg.wait_for_timeout(500)
@@ -136,11 +146,11 @@ with sync_playwright() as p:
     check("commissioner sees 0 bids before reveal", seen == 0, str(seen))
     # fast-forward the deadline, then reveal
     sql("alter table bid_weeks disable trigger bid_week_guard; update bid_weeks set bids_close_at = now() - interval '1 minute' where status='open'; alter table bid_weeks enable trigger bid_week_guard;")
-    pg.reload(); pg.wait_for_timeout(1500); pg.evaluate("go('office')"); pg.wait_for_timeout(400)
+    pg.reload(); pg.wait_for_function("document.querySelector('#nav').innerText.includes('sign out')", timeout=30000); pg.evaluate("go('office')"); pg.wait_for_timeout(400)
     pg.click("text=Reveal week 9 bids"); pg.wait_for_timeout(1200)
     body = pg.inner_text("body")
-    check("reveal shows Jauan Jennings with Pool Boy #1 ($9) over Tritons ($8)",
-          re.search(r"Jauan Jennings[\s\S]*#1\s+Pool Boy\s+\$9[\s\S]*#2\s+Tritons\s+\$8", body) is not None, body[:1200])
+    check("reveal shows Jauan Jennings with Pool Boy #1 ($9) over Purple Reign ($8)",
+          re.search(r"Jauan Jennings[\s\S]*#1\s+Pool Boy\s+\$9[\s\S]*#2\s+Purple Reign\s+\$8", body) is not None, body[:1200])
     pg.screenshot(path="/home/claude/e2e/reveal.png", full_page=True)
     check("no JS errors (commish)", not errs, "; ".join(errs))
     # 3b. Pool Boy (#1 on Jennings) claims him in his window, then tries to drop him
@@ -151,7 +161,7 @@ with sync_playwright() as p:
     btn.click(); pg.wait_for_timeout(1000)
     body = pg.inner_text("body")
     check("claim succeeds and shows on roster", "Jauan Jennings added at $9." in body and "ADDED: POOL BOY · $9" in body.upper(), body[:900])
-    check("over-cap warning banner with Sunday deadline", "is $4 over the $170 cap" in body and "Must be legal by Sun, Nov 1, 9:55 AM PT" in body, body[:1500])
+    check("over-cap warning banner with Sunday deadline", "is 1 player over the 15-man limit and $5 over the $170 cap" in body and "Must be legal by Sun, Nov 1, 9:55 AM PT" in body, body[:1500])
     pg.locator("tr:has-text('Jauan Jennings') button:has-text('drop')").last.click(); pg.wait_for_timeout(1000)
     check("Executive Order blocks same-week drop", "Executive Order" in pg.inner_text("body"))
     pg.screenshot(path="/home/claude/e2e/claim.png", full_page=True)
@@ -160,7 +170,8 @@ with sync_playwright() as p:
     ctx = br.new_context(viewport={"width": 390, "height": 844})
     ctx.add_init_script(f"localStorage.setItem('sb-apkzdhweoaeymxynawjx-auth-token', {json.dumps(session_for('pool'))});")
     ctx.route("https://apkzdhweoaeymxynawjx.supabase.co/**", lambda r: handle(r, USERS['pool'][0]))
-    m = ctx.new_page(); m.goto("http://localhost:8080/index.html"); m.wait_for_timeout(1500)
+    m = ctx.new_page(); m.goto("http://localhost:8080/index.html")
+    m.wait_for_function("document.querySelector('#nav') && document.querySelector('#nav').innerText.includes('sign out')", timeout=30000)
     m.evaluate("go('bids');state.bidTab='reveal';render()"); m.wait_for_timeout(400)
     m.screenshot(path="/home/claude/e2e/phone.png")
     sw = m.evaluate("document.documentElement.scrollWidth")

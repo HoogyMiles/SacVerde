@@ -269,7 +269,7 @@ function vHome(){
     </div>
   </div>
 
-  <h2>Standings <span class="sub">· 2025 Final · x = division winner, y = wildcard</span></h2>
+  <h2>Standings <span class="sub">· ${SEASON===2025?"2025 Final · x = division winner, y = wildcard":SEASON+" season"}</span></h2>
   <div class="grid g2">
   ${Object.entries(divs).map(([d,ts])=>`
     <div class="card"><h3>${d}</h3><table>
@@ -307,10 +307,10 @@ function vTeams(){
   <div class="spread"><h1>${esc(state.team)}</h1>
     <select onchange="state.team=this.value;render()">${TEAMS.map(x=>`<option ${x===state.team?"selected":""}>${esc(x)}</option>`).join("")}</select>
   </div>
-  <div class="sub">${i.owners?("Manager: "+esc(i.owners)+" · "):""}${i.division||""} ${i.standing?("· Finished "+i.standing):""}</div>
+  <div class="sub">${i.owners?("Manager: "+esc(i.owners)+" · "):""}${i.division||""} ${i.standing?("· "+(SEASON===2025?"Finished ":"Currently ")+i.standing):""}</div>
 
   <div class="grid g4" style="margin-top:16px">
-    <div class="card stat"><span class="lbl">2025 Record</span><span class="big">${rec(state.team)}</span><span class="sm mut">Division ${ (i.div_record||["-","-"]).slice(0,2).join("-") }</span></div>
+    <div class="card stat"><span class="lbl">${SEASON} Record</span><span class="big">${rec(state.team)}</span><span class="sm mut">Division ${ (i.div_record||["-","-"]).slice(0,2).join("-") }</span></div>
     <div class="card stat"><span class="lbl">Points For / Against</span><span class="big">${(+i.pf||0).toFixed(0)}</span><span class="sm mut">${(+i.pa||0).toFixed(0)} against · ${i.ppg||"-"} PPG</span></div>
     <div class="card stat"><span class="lbl">Active Salary</span><span class="big">${money(capUsed)}</span>
       <div class="bar" style="margin-top:6px"><i style="width:${Math.min(100,capUsed/CAP*100)}%"></i></div>
@@ -331,7 +331,7 @@ function vTeams(){
       </div>
     </div>
     <div>
-      <div class="card"><h3>2025 Schedule & Results</h3>
+      <div class="card"><h3>${SEASON} Schedule & Results</h3>
         <table><tr><th>Wk</th><th>Opponent</th><th></th><th class="r">Score</th></tr>
         ${t.schedule.map(s=>{const pl=PLAYOFF_LABEL[s.week];return `<tr>
           <td>${pl?`<span class="pill b">${s.week}</span>`:s.week}</td>
@@ -346,7 +346,7 @@ function vTeams(){
         ${h["Playoff Appearances"]?`<div class="sm" style="padding:3px 0">🎟️ <b>Playoffs:</b> ${h["Playoff Appearances"]}</div>`:""}
         ${h.all_time_gotw?`<div class="sm" style="padding:3px 0">⭐ <b>Game of the Week:</b> ${h.all_time_gotw.slice(0,2).join("-")}</div>`:""}
       </div>
-      <div class="card" style="margin-top:14px"><h3>2025 Transaction Log · ${t.transactions.length}</h3>
+      <div class="card" style="margin-top:14px"><h3>${SEASON} Transaction Log · ${t.transactions.length}</h3>
         <div style="max-height:340px;overflow:auto">${t.transactions.map(x=>`<div class="sm" style="padding:5px 0;border-bottom:1px solid #202024">${esc(x)}</div>`).join("")||'<span class="mut2 sm">No transactions</span>'}</div>
       </div>
     </div>
