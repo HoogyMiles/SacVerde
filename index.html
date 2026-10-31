@@ -242,7 +242,7 @@ const POSORD = {QB:1,RB:2,WR:3,TE:4,K:5,DST:6,DEF:6};
 let state = {view:"home", team:"Roaring Hoogy", week:14, bidTeam:"Roaring Hoogy", bids:{}, bidTab:"place", histTab:"2025", search:"", posF:"ALL", live:null, draftYear:"2025", draftView:"board", draftTeamF:"ALL", salaryTeamF:"ALL", salaryPosF:"ALL", salarySort:"market", schedWeek:"ALL", schedTeamF:"ALL", schedTab:"weekly", finTab:"overview"};
 
 // ---------- nav ----------
-const VIEWS = [["home","League Home"],["teams","Teams"],["schedule","Schedule"],["draft","Draft"],["salary","Salary List"],["financials","Financials"],["bids","Bid Room"],["match","Matchup Center"],["forum","Forum"],["history","History"],["rules","Rules"],["office","Front Office"]];
+const VIEWS = [["home","League Home"],["teams","Teams"],["schedule","Schedule"],["draft","Draft"],["salary","Salary List"],["financials","Financials"],["bids","Bid Room"],["myteam","My Team"],["match","Matchup Center"],["forum","Forum"],["history","History"],["rules","Rules"],["office","Front Office"]];
 function nav(){ $("#nav").innerHTML = VIEWS.map(([k,l])=>`<button class="${state.view===k?'on':''}" onclick="go('${k}')">${l}</button>`).join(""); }
 function go(v){ state.view=v; if(state.live){clearInterval(state.live.timer); state.live=null;} render(); window.scrollTo(0,0); }
 function goTeam(t){ state.team=t; go("teams"); }
@@ -1723,7 +1723,7 @@ function ruleTab(btn, id){
 // ---------- render ----------
 function render(){
   nav();
-  const v = {home:vHome, teams:vTeams, schedule:vSchedule, draft:vDraft, salary:vSalary, financials:vFinancials, bids:vBids, match:vMatch, forum:vForum, history:vHistory, rules:vRules, office:vOffice}[state.view];
+  const v = {home:vHome, teams:vTeams, schedule:vSchedule, draft:vDraft, salary:vSalary, financials:vFinancials, bids:vBids, myteam:(typeof vMyTeam==="function"?vMyTeam:vHome), match:vMatch, forum:vForum, history:vHistory, rules:vRules, office:vOffice}[state.view];
   $("#app").innerHTML = v() + `<div class="footer-cta">SACVERDE LEAGUE PLATFORM \u00b7 2025 history archive \u00b7 2026 season live</div>`;
 }
 </script>

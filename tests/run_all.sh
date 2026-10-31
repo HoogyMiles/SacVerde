@@ -1,7 +1,7 @@
 #!/bin/bash
 # start local postgres, rebuild DB with all migrations, seed test users/bids, serve site, run browser test
-rm -f /tmp/pg/data/postmaster.pid
-su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /tmp/pg/data -l /tmp/pg/log -o '-k /tmp/pg -p 5433' start" >/dev/null 2>&1; sleep 2
+pg_isready -h /tmp/pg -p 5433 -q || rm -f /tmp/pg/data/postmaster.pid
+pg_isready -h /tmp/pg -p 5433 -q || su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /tmp/pg/data -l /tmp/pg/log -o '-k /tmp/pg -p 5433' start" >/dev/null 2>&1; sleep 2
 P="psql -h /tmp/pg -p 5433 -U postgres -v ON_ERROR_STOP=1 -q"
 $P -c "drop database if exists sv" -c "create database sv" >/dev/null
 for f in /home/claude/sacverde/db/000_local_supabase_stub.sql /home/claude/repo/db/0*.sql; do $P -d sv -f $f 2>&1 | grep -i error; done

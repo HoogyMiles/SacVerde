@@ -17,6 +17,8 @@ def sql(q, uid=None):
 
 def lit(v):
     if v is None: return "null"
+    if isinstance(v, list): return ("ARRAY[" + ",".join(str(int(x)) for x in v) + "]::int[]") if v else "'{}'::int[]"
+    if isinstance(v, bool): return "true" if v else "false"
     if isinstance(v, (int, float)): return str(v)
     return "'" + str(v).replace("'", "''") + "'"
 
@@ -120,7 +122,8 @@ with sync_playwright() as p:
     pg.locator("input[type=number]").first.fill("3"); pg.locator("input[type=number]").first.dispatch_event("change"); pg.wait_for_timeout(800)
     check("too-low bid rejected with min-bid message", "BID TOO LOW: minimum bid is $6" in pg.inner_text("body"))
     pg.fill(".searchrow input", "Jauan"); pg.wait_for_timeout(300)
-    pg.locator("input[type=number]").first.fill("8"); pg.locator("input[type=number]").first.dispatch_event("change"); pg.wait_for_timeout(800)
+    pg.locator("input[type=number]").first.fill("8"); pg.locator("input[type=number]").first.dispatch_event("change")
+    pg.wait_for_function("document.body.innerText.includes('Sealed: Jauan Jennings')", timeout=15000)
     body = pg.inner_text("body")
     check("valid bid sealed and listed", "Sealed: Jauan Jennings for $8" in body and "YOUR SEALED BIDS · WEEK 9 (2)" in body.upper(), body[:800])
     pg.evaluate("go('forum')"); pg.wait_for_timeout(400)
@@ -130,7 +133,7 @@ with sync_playwright() as p:
     check("no JS errors (Purple Reign)", not errs, "; ".join(errs))
     pg.evaluate("go('teams'); state.team='Steel Curtain'; render()"); pg.wait_for_timeout(400)
     body = pg.inner_text("body")
-    check("Teams page shows 2026 roster + record (Curtain 4-3, Derrick Henry, $212)", "2026 RECORD" in body.upper() and "4-3" in body and "Derrick Henry" in body and "$212" in body, body[:1200])
+    check("Teams page shows 2026 roster + record (Curtain 4-3, Derrick Henry, $191)", "2026 RECORD" in body.upper() and "4-3" in body and "Derrick Henry" in body and "$191" in body, body[:1200])
     pg.evaluate("go('home')"); pg.wait_for_timeout(400)
     body = pg.inner_text("body")
     check("Home shows 2026 divisions", "Sailgating Syndicate" in body and "Thunderdome" in body, body[:800])
@@ -166,7 +169,31 @@ with sync_playwright() as p:
     check("Executive Order blocks same-week drop", "Executive Order" in pg.inner_text("body"))
     pg.screenshot(path="/home/claude/e2e/claim.png", full_page=True)
     check("no JS errors (Pool Boy)", not errs, "; ".join(errs))
-    # 4. phone width
+    # 4. My Team: IR move + trade proposed by Purple Reign, accepted + approved by Hoogy (commissioner)
+    pg, errs = page_as(br, "tritons")
+    pg.evaluate("go('myteam')"); pg.wait_for_timeout(500)
+    body = pg.inner_text("body")
+    check("My Team page shows roster with IR/promote buttons", "MY TEAM" in body.upper() and "promote" in body and "PROPOSE A TRADE" in body.upper(), body[:600])
+    pg.select_option("select >> nth=0", label="Roaring Hoogy"); pg.wait_for_timeout(400)
+    pg.locator("label:has-text('Jerry Jeudy') input").check()
+    pg.locator("label:has-text('Case Keenum') input").check()
+    pg.fill("#pk_give", "2027 5th (own)"); pg.click("text=Send offer")
+    pg.wait_for_function("document.body.innerText.includes('Offer sent to Roaring Hoogy')", timeout=15000)
+    check("trade offer sent", True)
+    check("no JS errors (Purple Reign trade)", not errs, "; ".join(errs))
+    pg, errs = page_as(br, "hoogy")
+    pg.evaluate("go('myteam')"); pg.wait_for_timeout(500)
+    check("Hoogy sees the offer", "OFFERS TO YOU" in pg.inner_text("body").upper() and "Jerry Jeudy" in pg.inner_text("body"))
+    pg.click("text=Accept"); pg.wait_for_function("document.body.innerText.includes('goes to the commissioner')", timeout=15000)
+    pg.click("text=Approve"); pg.wait_for_function("document.body.innerText.includes('Trade approved')", timeout=15000)
+    body = pg.inner_text("body")
+    check("approved trade moves Jeudy to Hoogy's roster", "Jerry Jeudy" in pg.inner_text(".card:has-text('Your 2026 Roster')"), body[:800])
+    pg.locator("tr:has-text('Deebo Samuel') button:has-text('IR')").click()
+    pg.wait_for_function("document.body.innerText.includes('moved to IR')", timeout=15000)
+    check("IR button moves player and shows return week", "Earliest return: week 11" in pg.inner_text("body"))
+    pg.screenshot(path="/home/claude/e2e/myteam.png", full_page=True)
+    check("no JS errors (Hoogy my team)", not errs, "; ".join(errs))
+    # 5. phone width
     ctx = br.new_context(viewport={"width": 390, "height": 844})
     ctx.add_init_script(f"localStorage.setItem('sb-apkzdhweoaeymxynawjx-auth-token', {json.dumps(session_for('pool'))});")
     ctx.route("https://apkzdhweoaeymxynawjx.supabase.co/**", lambda r: handle(r, USERS['pool'][0]))

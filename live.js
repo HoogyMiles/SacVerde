@@ -131,7 +131,7 @@ async function loadSeason(){
   const [ps, sal, rs, bw, st] = await Promise.all([
     fetchAll(()=>sb.from("players").select("id,name,pos,nfl_team,rookie,active").order("id")),
     fetchAll(()=>sb.from("player_salaries").select("player_id,list_salary").eq("season",yr).order("player_id")),
-    fetchAll(()=>sb.from("roster_spots").select("team_id,player_id,status,salary,contract").eq("season",yr).order("id")),
+    fetchAll(()=>sb.from("roster_spots").select("team_id,player_id,status,salary,contract,acquired_via,acquired_week,ir_since_week").eq("season",yr).order("id")),
     sb.from("bid_weeks").select("*").eq("season",yr).order("week",{ascending:false}),
     fetchAll(()=>sb.from("standings").select("week,team_id,rank").eq("season",yr).order("week"))
   ]);
@@ -154,6 +154,11 @@ async function loadSeason(){
     sb.from("divisions").select("id,name"),
     sb.from("teams").select("id,name,division_id")]);
   LIVE.m26 = m26.data||[]; LIVE.divs = divs.data||[]; LIVE.teamRows = tms.data||[];
+  const [tr, ti] = await Promise.all([
+    sb.from("trades").select("*").eq("season",yr).order("created_at",{ascending:false}),
+    sb.from("trade_items").select("*")]);
+  LIVE.trades = tr.data||[]; LIVE.tradeItems = ti.data||[];
+  const tdl = await sb.rpc("trade_deadline", {p_season: yr}); LIVE.tradeDeadline = tdl.data;
   const comp = await sb.rpc("team_compliance", {p_season: yr});
   LIVE.compliance = comp.data || [];
   const dl = await sb.rpc("compliance_deadline", {p_season: yr, p_week: LIVE.season.current_week});
@@ -316,16 +321,38 @@ async function markYahoo(id, v){
   const {error} = await sb.from("penalties").update({applied_in_yahoo:v}).eq("id",id);
   if(error) return showErr(error); await loadSeason(); render();
 }
+function rosterButtons(r){
+  const lw = LIVE.season.current_week, nIR = LIVE.roster26.filter(x=>x.team_id===LIVE.me.team_id && x.status==="ir").length;
+  const b = (fn,label,title)=>`<button class="btn ghost sm" title="${title||""}" onclick="${fn}(${r.player_id})">${label}</button> `;
+  if(r.status==="taxi") return b("promoteTaxi","promote","Move up to your active roster (permanent)");
+  if(r.status==="ir"){
+    const back = (r.ir_since_week||0) + LIVE.season.ir_min_weeks;
+    return lw >= back ? b("activateIR","activate","Return from IR") : `<span class="sm mut2" title="3-week minimum">back wk ${back}</span> `;
+  }
+  let out = nIR < LIVE.season.max_ir && r.p.nfl_team!=="FA" ? b("placeIR","IR","Move to injured reserve (half salary counts)") : "";
+  if(r.p.rookie && r.acquired_via==="fa_bid" && r.acquired_week>=lw) out += b("toTaxi","taxi","Move this new rookie to your taxi squad");
+  return out;
+}
+async function rosterMove(fn, pid, confirmText){
+  if(confirmText && !confirm(confirmText)) return;
+  const {data, error} = await sb.rpc(fn, {p_player:pid});
+  if(error) return showErr(error);
+  await loadSeason(); if(LIVE.roster26.length) build2026(); flash(data);
+}
+const placeIR = pid=>rosterMove("place_on_ir", pid, `Move ${LIVE.byId[pid].name} to IR? He must stay at least ${LIVE.season.ir_min_weeks} weeks.`);
+const activateIR = pid=>rosterMove("activate_from_ir", pid);
+const promoteTaxi = pid=>rosterMove("promote_from_taxi", pid, `Promote ${LIVE.byId[pid].name}? This is permanent and his salary will count against your cap.`);
+const toTaxi = pid=>rosterMove("move_to_taxi", pid);
 function myRosterHTML(){
   const me = LIVE.me.team_id, cap = capInfo(me);
   const rows = LIVE.roster26.filter(r=>r.team_id===me).map(r=>({...r, p:LIVE.byId[r.player_id]}))
     .sort((a,b)=>(POSORD[a.p.pos]||9)-(POSORD[b.p.pos]||9) || b.salary-a.salary);
   if(!rows.length) return "";
   return `<div class="card" style="margin-top:14px"><h3>Your ${LIVE.season.year} Roster · ${cap.count}/${LIVE.season.roster_size} active · ${money(cap.used)} of $${LIVE.season.salary_cap}</h3>
-    <table><tr><th>Pos</th><th>Player</th><th>NFL</th><th class="r">Salary</th><th></th></tr>
+    <div style="overflow-x:auto"><table><tr><th>Pos</th><th>Player</th><th>NFL</th><th class="r">Salary</th><th></th></tr>
     ${rows.map(r=>`<tr><td><span class="pos ${r.p.pos}">${r.p.pos}</span></td><td>${esc(r.p.name)}${r.status!=="active"?` <span class="badge">${r.status.toUpperCase()}</span>`:""}</td><td class="mut">${r.p.nfl_team}</td>
-      <td class="r">${money(r.salary)}</td><td class="r"><button class="btn ghost sm" onclick="dropPlayer(${r.player_id})">drop</button></td></tr>`).join("")}
-    </table></div>`;
+      <td class="r">${money(r.salary)}</td><td class="r">${rosterButtons(r)}<button class="btn ghost sm" onclick="dropPlayer(${r.player_id})">drop</button></td></tr>`).join("")}
+    </table></div></div>`;
 }
 function bidRulesHTML(){
   return `<div class="grid g2">
@@ -340,6 +367,69 @@ function bidRulesHTML(){
   </div>`;
 }
 function flashHTML(){ const f=state.flash; if(!f) return ""; state.flash=null; return `<div class="note" style="${f.bad?'border-color:var(--red)':''}">${f.bad?'⚠️ ':'✅ '}${esc(f.msg)}</div>`; }
+
+// ---------- MY TEAM: roster moves + trades ----------
+function vMyTeam(){
+  return `<h1>My Team · ${esc(state.team)}</h1>
+  <div class="sub">Roster moves and trades. IR: max ${LIVE.season.max_ir}, ${LIVE.season.ir_min_weeks}-week minimum, half salary counts. Taxi: max ${LIVE.season.max_taxi}, rookies only, off the cap.</div>
+  ${flashHTML()}${complianceBanner(LIVE.me.team_id)}${myRosterHTML()}
+  <h2>Trades</h2>${tradesHTML()}`;
+}
+function tradeLine(t){
+  const items = LIVE.tradeItems.filter(i=>i.trade_id===t.id);
+  const side = team=>{ const ps = items.filter(i=>i.from_team===team).map(i=>{const p=LIVE.byId[i.player_id]||{}; return `${esc(p.name)} <span class="mut2 sm">${p.pos||""}</span>`;});
+    const pk = team===t.from_team ? t.picks_from : t.picks_to; if(pk) ps.push(`<span class="sm">${esc(pk)}</span>`); return ps.join(", ")||"—"; };
+  return `<b>${esc(LIVE.teamsById[t.from_team])}</b> send ${side(t.from_team)} <span class="mut">↔</span> <b>${esc(LIVE.teamsById[t.to_team])}</b> send ${side(t.to_team)}
+    ${t.note?`<div class="sm mut">“${esc(t.note)}”</div>`:""}${t.commish_note?`<div class="sm mut">Commissioner: ${esc(t.commish_note)}</div>`:""}`;
+}
+function tradesHTML(){
+  const me = LIVE.me.team_id, T = LIVE.trades, isC = LIVE.me.role==="commissioner";
+  const pill = st=>`<span class="pill ${st==="approved"?"g":st==="accepted"?"y":"b"}">${st}</span>`;
+  const incoming = T.filter(t=>t.to_team===me && t.status==="proposed");
+  const mine = T.filter(t=>(t.from_team===me||t.to_team===me) && !(t.to_team===me && t.status==="proposed"));
+  const toApprove = isC ? T.filter(t=>t.status==="accepted") : [];
+  const others = Object.entries(LIVE.teamsById).filter(([id])=>+id!==me).sort((a,b)=>a[1].localeCompare(b[1]));
+  const sel = state.tradeTo || (others[0]&&others[0][0]);
+  const listFor = (tid, name)=>LIVE.roster26.filter(r=>r.team_id===+tid).map(r=>({...r,p:LIVE.byId[r.player_id]}))
+    .sort((a,b)=>(POSORD[a.p.pos]||9)-(POSORD[b.p.pos]||9)||b.salary-a.salary)
+    .map(r=>`<label class="sm" style="display:block;padding:2px 0"><input type="checkbox" name="${name}" value="${r.player_id}"> <span class="pos ${r.p.pos}">${r.p.pos}</span> ${esc(r.p.name)} <span class="mut2">${money(r.salary)}${r.status!=="active"?" · "+r.status.toUpperCase():""}</span></label>`).join("");
+  const dl = LIVE.tradeDeadline ? `Trade deadline: <b>${fmtPT(LIVE.tradeDeadline)}</b> (kickoff of week 11).` : "";
+  return `
+  ${toApprove.length?`<div class="card" style="margin-bottom:14px"><h3>Waiting on your approval (commissioner)</h3>${toApprove.map(t=>`<div style="padding:8px 0;border-bottom:1px solid var(--line)">${tradeLine(t)}
+    <div class="flex" style="margin-top:6px"><input type="text" id="cn_${t.id}" placeholder="Note to the league (optional)" style="flex:1">
+    <button class="btn sm" onclick="decideTrade(${t.id},true)">Approve</button> <button class="btn ghost sm" onclick="decideTrade(${t.id},false)">Reject</button></div></div>`).join("")}</div>`:""}
+  ${incoming.length?`<div class="card" style="margin-bottom:14px"><h3>Offers to you</h3>${incoming.map(t=>`<div style="padding:8px 0;border-bottom:1px solid var(--line)">${tradeLine(t)}
+    <div style="margin-top:6px"><button class="btn sm" onclick="respondTrade(${t.id},true)">Accept</button> <button class="btn ghost sm" onclick="respondTrade(${t.id},false)">Decline</button></div></div>`).join("")}</div>`:""}
+  <div class="card" style="margin-bottom:14px"><h3>Propose a trade</h3>
+    <div class="sm mut" style="margin-bottom:8px">${dl} Accepted trades go to the commissioner for approval. Players added in free agency this week can't be traded until next week (Pair of Juggs).</div>
+    <div class="flex" style="margin-bottom:10px">Trade with <select onchange="state.tradeTo=this.value;render()">${others.map(([id,n])=>`<option value="${id}" ${+id===+sel?"selected":""}>${esc(n)}</option>`).join("")}</select></div>
+    <div class="grid g2">
+      <div><div class="sub" style="margin-bottom:6px">You send</div>${listFor(me,"give")}<input type="text" id="pk_give" placeholder="Picks you send, e.g. 2027 2nd (own)" style="width:100%;margin-top:6px"></div>
+      <div><div class="sub" style="margin-bottom:6px">You get from ${esc(LIVE.teamsById[sel])}</div>${listFor(sel,"get")}<input type="text" id="pk_get" placeholder="Picks you get" style="width:100%;margin-top:6px"></div>
+    </div>
+    <input type="text" id="tr_note" placeholder="Message (optional)" style="width:100%;margin:10px 0">
+    <button class="btn" onclick="proposeTrade(${sel})">Send offer</button>
+  </div>
+  <div class="card"><h3>Your trades & league trade log</h3>
+    ${[...mine, ...T.filter(t=>t.status==="approved" && t.from_team!==me && t.to_team!==me)].map(t=>`<div style="padding:8px 0;border-bottom:1px solid var(--line)">
+      ${pill(t.status)} <span class="sm mut2">${fmtPT(t.decided_at||t.responded_at||t.created_at)}</span><div>${tradeLine(t)}</div>
+      ${t.from_team===me && ["proposed","accepted"].includes(t.status)?`<button class="btn ghost sm" style="margin-top:4px" onclick="cancelTrade(${t.id})">cancel offer</button>`:""}</div>`).join("") || '<div class="sm mut">No trades yet.</div>'}
+  </div>`;
+}
+const checked = name=>[...document.querySelectorAll(`input[name=${name}]:checked`)].map(x=>+x.value);
+async function proposeTrade(to){
+  const give = checked("give"), get = checked("get");
+  const {error} = await sb.rpc("propose_trade", {p_to_team:+to, p_give:give, p_get:get, p_picks_give:$("#pk_give").value, p_picks_get:$("#pk_get").value, p_note:$("#tr_note").value});
+  if(error) return showErr(error); await loadSeason(); flash(`Offer sent to ${LIVE.teamsById[to]}.`);
+}
+async function respondTrade(id, ok){ const {data,error} = await sb.rpc("respond_trade", {p_trade:id, p_accept:ok}); if(error) return showErr(error); await loadSeason(); flash(data); }
+async function cancelTrade(id){ const {data,error} = await sb.rpc("cancel_trade", {p_trade:id}); if(error) return showErr(error); await loadSeason(); flash(data); }
+async function decideTrade(id, ok){
+  const note = ($("#cn_"+id)||{}).value||null;
+  if(!confirm(ok?"Approve this trade? Rosters update immediately.":"Reject this trade?")) return;
+  const {data,error} = await sb.rpc("decide_trade", {p_trade:id, p_approve:ok, p_note:note});
+  if(error) return showErr(error); await loadSeason(); if(LIVE.roster26.length) build2026(); flash(data);
+}
 
 // ---------- FORUM (real) ----------
 async function loadForum(){
