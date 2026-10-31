@@ -90,7 +90,7 @@ async function loadSeason(){
   }
   LIVE.revealed = null;
   if(LIVE.lastRevealed){
-    const {data} = await sb.from("bids").select("player_id,team_id,amount,created_at").eq("bid_week_id",LIVE.lastRevealed.id);
+    const {data} = await sb.from("bid_results").select("*").eq("bid_week_id",LIVE.lastRevealed.id).order("priority");
     LIVE.revealed = data||[];
   }
 }
@@ -165,6 +165,7 @@ vBids = function(){
   </table></div>`:""}
   `) : ""}
   ${state.bidTab==='reveal' ? revealHTML() : ""}
+  ${state.bidTab!=='rules' ? myRosterHTML() : ""}
   ${state.bidTab==='rules' ? bidRulesHTML() : ""}`;
 };
 async function placeBid(pid, val){
@@ -183,23 +184,50 @@ function revealHTML(){
   const w = LIVE.lastRevealed;
   if(!w) return `<div class="note">No week has been revealed yet.</div>`;
   const by = {}; LIVE.revealed.forEach(b=>(by[b.player_id]=by[b.player_id]||[]).push(b));
-  const close = new Date(w.bids_close_at);
-  // Windows land on the Friday/Saturday/Sunday after the close (PT calendar), not "close + N days".
-  const ptDow = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].indexOf(close.toLocaleDateString("en-US", {...PT, weekday:"short"}));
-  const toFri = ((5 - ptDow + 7) % 7) || 7;
-  const day = n=>{ const d=new Date(close.getTime() + (toFri+n)*86400000); return d.toLocaleDateString([], {...PT, weekday:"short", month:"short", day:"numeric"}); };
-  const win = [`until ${day(0)} 9:00am PT`, `${day(0)} 9am – ${day(1)} 9am PT`, `${day(1)} 9am – ${day(2)} 9am PT`];
-  const cards = Object.entries(by).map(([pid,bids])=>{
-    const p = LIVE.byId[pid]; const {sorted, unresolved} = priorityOrder(bids, w.week);
-    return {p, sorted, unresolved, top:sorted[0].amount};
-  }).sort((a,b)=>b.top-a.top);
-  return `<div class="note">Week ${w.week} reveal · bids closed ${fmtPT(w.bids_close_at)}. Priority: highest bid, ties to the team lower in the standings. Only teams that bid on a player can add him. After ${day(2)} 9am PT any bidder may add, first come first served, at their own bid. <i>TNF players use the Thursday 12pm / 4pm windows.</i></div>
+  const now = new Date(), me = LIVE.me.team_id;
+  const rostered = new Set(LIVE.roster26.map(r=>r.player_id));
+  const t = d=>d?new Date(d).toLocaleString([], {...PT, weekday:"short", hour:"numeric", minute:"2-digit"}):"";
+  const winTxt = b=> b.window_end ? (b.priority===1?`until ${t(b.window_end)}`:`${t(b.window_start)} – ${t(b.window_end)}`) : `from ${t(b.open_from)}`;
+  const canClaim = b=> b.team_id===me && !rostered.has(b.player_id) && (!b.kickoff_at || now < new Date(b.kickoff_at))
+      && ((b.window_start && now >= new Date(b.window_start) && now < new Date(b.window_end)) || now >= new Date(b.open_from));
+  const myRoster = LIVE.roster26.filter(r=>r.team_id===me).map(r=>({...r, p:LIVE.byId[r.player_id]})).sort((a,b)=>(POSORD[a.p.pos]||9)-(POSORD[b.p.pos]||9));
+  const dropSel = pid=>`<select id="drop_${pid}" class="sm"><option value="">no drop</option>${myRoster.map(r=>`<option value="${r.player_id}">drop ${esc(r.p.name)} (${money(r.salary)})</option>`).join("")}</select>`;
+  const cards = Object.entries(by).map(([pid,rows])=>({p:LIVE.byId[pid], rows, top:rows[0].amount,
+      owner: LIVE.roster26.find(r=>r.player_id===+pid)})).sort((a,b)=>b.top-a.top);
+  return `<div class="note">Week ${w.week} reveal · bids closed ${fmtPT(w.bids_close_at)}. Priority = highest bid; ties go to the team lower in the standings. Only teams that bid on a player can add him, at their own bid. Thursday-game players use the Thursday 12pm / 4pm windows. All times PT.</div>
+  ${flashHTML()}
   <div class="grid g2">${cards.map(c=>`<div class="card">
-    <div class="spread"><div><span class="pos ${c.p.pos}">${c.p.pos}</span> <b>${esc(c.p.name)}</b> <span class="sm mut">${c.p.nfl_team} · ${money(c.p.salary)}</span></div></div>
-    ${c.unresolved?`<div class="warn sm">Tie can't be broken yet — standings for week ${w.week-1} aren't loaded.</div>`:""}
-    <table style="margin-top:8px">${c.sorted.map((b,i)=>`<tr><td>${i<3?`<span class="pill ${i===0?'g':'b'}">#${i+1}</span>`:`<span class="sm mut2">#${i+1}</span>`}</td>
-      <td>${esc(LIVE.teamsById[b.team_id])}</td><td class="r"><b>${money(b.amount)}</b></td><td class="sm mut">${i<3?win[i]:"open window"}</td></tr>`).join("")}</table>
+    <div class="spread"><div><span class="pos ${c.p.pos}">${c.p.pos}</span> <b>${esc(c.p.name)}</b> <span class="sm mut">${c.p.nfl_team} · list ${money(c.p.salary)}</span></div>
+      ${c.owner?`<span class="pill g">ADDED: ${esc(LIVE.teamsById[c.owner.team_id])} · ${money(c.owner.salary)}</span>`:""}</div>
+    <table style="margin-top:8px">${c.rows.map(b=>`<tr><td>${b.priority<=3?`<span class="pill ${b.priority===1?'g':'b'}">#${b.priority}</span>`:`<span class="sm mut2">#${b.priority}</span>`}</td>
+      <td>${esc(LIVE.teamsById[b.team_id])}</td><td class="r"><b>${money(b.amount)}</b></td><td class="sm mut">${winTxt(b)}</td></tr>
+      ${canClaim(b)?`<tr><td></td><td colspan="3"><div class="flex">${dropSel(b.player_id)} <button class="btn sm" onclick="claim(${w.id},${b.player_id})">Add ${esc(c.p.name)} for ${money(b.amount)}</button></div></td></tr>`:""}`).join("")}
+    </table>
+    ${!c.owner && c.rows[0].kickoff_at?`<div class="sm mut2" style="margin-top:6px">Adds close at kickoff: ${fmtPT(c.rows[0].kickoff_at)}</div>`:""}
   </div>`).join("") || `<div class="note">No bids were placed that week.</div>`}</div>`;
+}
+async function claim(wid, pid){
+  const d = $("#drop_"+pid), drop = d && d.value ? +d.value : null;
+  const {data, error} = await sb.rpc("claim_player", {p_week_id:wid, p_player:pid, p_drop:drop});
+  if(error) return showErr(error);
+  await loadSeason(); flash(data);
+}
+async function dropPlayer(pid){
+  if(!confirm(`Drop ${LIVE.byId[pid].name}? He becomes a free agent for next week's bidding.`)) return;
+  const {data, error} = await sb.rpc("drop_player", {p_player:pid});
+  if(error) return showErr(error);
+  await loadSeason(); flash(data);
+}
+function myRosterHTML(){
+  const me = LIVE.me.team_id, cap = capInfo(me);
+  const rows = LIVE.roster26.filter(r=>r.team_id===me).map(r=>({...r, p:LIVE.byId[r.player_id]}))
+    .sort((a,b)=>(POSORD[a.p.pos]||9)-(POSORD[b.p.pos]||9) || b.salary-a.salary);
+  if(!rows.length) return "";
+  return `<div class="card" style="margin-top:14px"><h3>Your ${LIVE.season.year} Roster · ${cap.count}/${LIVE.season.roster_size} active · ${money(cap.used)} of $${LIVE.season.salary_cap}</h3>
+    <table><tr><th>Pos</th><th>Player</th><th>NFL</th><th class="r">Salary</th><th></th></tr>
+    ${rows.map(r=>`<tr><td><span class="pos ${r.p.pos}">${r.p.pos}</span></td><td>${esc(r.p.name)}${r.status!=="active"?` <span class="badge">${r.status.toUpperCase()}</span>`:""}</td><td class="mut">${r.p.nfl_team}</td>
+      <td class="r">${money(r.salary)}</td><td class="r"><button class="btn ghost sm" onclick="dropPlayer(${r.player_id})">drop</button></td></tr>`).join("")}
+    </table></div>`;
 }
 function bidRulesHTML(){
   return `<div class="grid g2">
@@ -276,11 +304,11 @@ vOffice = function(){
     <div class="card"><h3>Bid Week</h3>
       ${w?`<div class="sm">Week <b>${w.week}</b> is open · closes <b>${fmtPT(w.bids_close_at)}</b>.</div>
            ${new Date(w.bids_close_at)<=new Date()?`<button class="btn" style="margin-top:10px" onclick="revealWeek(${w.id})">Reveal week ${w.week} bids</button>`:`<div class="sm mut" style="margin-top:8px">The reveal button appears once bids close. You can't see bids before then either.</div>`}`
-         :`<div class="sm mut" style="margin-bottom:8px">No week open. Open the next one:</div>
-           <div class="flex">Week <input type="number" id="bw_week" value="${(LIVE.lastRevealed?LIVE.lastRevealed.week:LIVE.season.current_week)+1}" style="width:60px">
-           closes <input type="datetime-local" id="bw_close" value="${nextTue}"></div>
-           <div class="sm mut2" style="margin:6px 0">Close time is in your computer's time zone (set it to 9:00 PM PT).</div>
+         :`<div class="sm mut" style="margin-bottom:8px">No week open. The site opens one automatically after each reveal (closing Tuesday 9:00 PM PT). To open one now with a custom deadline:</div>
+           <div class="flex">closes <input type="datetime-local" id="bw_close" value="${nextTue}"></div>
+           <div class="sm mut2" style="margin:6px 0">Time is in your computer's time zone. The week number is set from the NFL schedule.</div>
            <button class="btn" onclick="openWeek()">Open bidding</button>`}
+      <div class="sm mut2" style="margin-top:8px">Reveals happen automatically within 5 minutes of the deadline.</div>
       ${c?`<div class="sm" style="margin-top:10px">Week ${c.week} is closed and waiting: <button class="btn sm" onclick="revealWeek(${c.id})">Reveal</button></div>`:""}
     </div>
     <div class="card"><h3>Season</h3><div class="sm" style="line-height:2">Season <b>${LIVE.season.year}</b> · current week <b>${LIVE.season.current_week}</b> · cap <b>$${LIVE.season.salary_cap}</b><br>
@@ -289,13 +317,13 @@ vOffice = function(){
   <div style="margin-top:20px">${_vOffice()}</div>`;
 };
 async function openWeek(){
-  const week = parseInt($("#bw_week").value,10), close = new Date($("#bw_close").value);
-  if(!week || isNaN(close)) return showErr("Enter a week and a close time.");
-  const {error} = await sb.from("bid_weeks").insert({season:LIVE.season.year, week, bids_close_at:close.toISOString()});
+  const close = new Date($("#bw_close").value);
+  if(isNaN(close)) return showErr("Enter a close time.");
+  const {data:week, error} = await sb.rpc("open_bid_week", {p_close:close.toISOString()});
   if(error) return showErr(error); await loadSeason(); flash(`Week ${week} bidding is open until ${fmtPT(close)}.`);
 }
 async function revealWeek(id){
-  const {error} = await sb.from("bid_weeks").update({status:"revealed", revealed_at:new Date().toISOString()}).eq("id",id);
+  const {error} = await sb.rpc("reveal_bid_week", {p_week_id:id});
   if(error) return showErr(error); await loadSeason(); state.view="bids"; state.bidTab="reveal"; render();
 }
 

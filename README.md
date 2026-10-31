@@ -1,7 +1,8 @@
 # SacVerde League
 
-League site for SacVerde fantasy football: salaries, $170 cap, sealed Tuesday blind bidding, forum, history.
+League site for SacVerde fantasy football: salaries, $170 cap, sealed Tuesday blind bidding, claims, drops, forum, history.
 
 - `index.html`, `live.js`, `supabase.js` — the website (static; Vercel serves it as-is).
-- `db/` — Supabase setup. Run 001 → 004 in order in the Supabase SQL Editor.
-- `tests/` — local-only tests (security rules + full browser test). Never run `000_local_supabase_stub.sql` in Supabase.
+- `db/` — Supabase setup. Run files in number order in the Supabase SQL Editor (each only once).
+  - 001 schema · 002 security · 003 league seed · 004 2025 history · 005 bidding engine · 006 2026 NFL schedule · 007 fixes
+- `tests/` — local-only tests (security, engine, full browser). Never run `000_local_supabase_stub.sql` in Supabase.

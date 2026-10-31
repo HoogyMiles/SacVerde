@@ -38,6 +38,11 @@ def handle(route, uid):
         if path.startswith("/auth/v1/"):
             return route.fulfill(status=200, json={})
         table = path.split("/rest/v1/")[1]
+        if table.startswith("rpc/"):
+            fn = table[4:]; args = json.loads(req.post_data or "{}")
+            a = ", ".join(f"{k} => {lit(v)}" for k, v in args.items())
+            out = sql(f"select to_json(public.{fn}({a}));", uid)
+            return route.fulfill(status=200, body=out or "null", headers={"content-type": "application/json"})
         P = dict(params)
         if req.method == "GET":
             cols = P.get("select", "*")
@@ -86,7 +91,7 @@ def page_as(br, who):
     ctx.route("https://apkzdhweoaeymxynawjx.supabase.co/**", lambda r: handle(r, uid))
     pg = ctx.new_page(); errs = []
     pg.on("pageerror", lambda e: errs.append(str(e)))
-    pg.on("dialog", lambda d: d.dismiss())
+    pg.on("dialog", lambda d: d.accept())
     pg.goto("http://localhost:8080/index.html"); pg.wait_for_timeout(1500)
     return pg, errs
 
@@ -106,7 +111,7 @@ with sync_playwright() as p:
     check("header shows signed-in team", "Tritons · sign out" in pg.inner_text("#nav"))
     pg.evaluate("go('bids')"); pg.wait_for_timeout(500)
     body = pg.inner_text("body")
-    check("bid room shows open week 9", "Week 9 bids close" in body, body[:500])
+    check("bid room shows auto-opened week 9 closing Tue 9pm PT", "Week 9 bids close Tue, Nov 3, 9:00 PM PT" in body, body[:500])
     pg.fill(".searchrow input", "Jauan"); pg.wait_for_timeout(300)
     pg.locator("input[type=number]").first.fill("3"); pg.locator("input[type=number]").first.dispatch_event("change"); pg.wait_for_timeout(800)
     check("too-low bid rejected with min-bid message", "BID TOO LOW: minimum bid is $6" in pg.inner_text("body"))
@@ -136,6 +141,18 @@ with sync_playwright() as p:
           re.search(r"Jauan Jennings[\s\S]*#1\s+Pool Boy\s+\$9[\s\S]*#2\s+Tritons\s+\$8", body) is not None, body[:1200])
     pg.screenshot(path="/home/claude/e2e/reveal.png", full_page=True)
     check("no JS errors (commish)", not errs, "; ".join(errs))
+    # 3b. Pool Boy (#1 on Jennings) claims him in his window, then tries to drop him
+    pg, errs = page_as(br, "pool")
+    pg.evaluate("go('bids');state.bidTab='reveal';render()"); pg.wait_for_timeout(400)
+    btn = pg.locator("text=Add Jauan Jennings for $9")
+    check("claim button shown to #1 bidder in window", btn.count() == 1)
+    btn.click(); pg.wait_for_timeout(1000)
+    body = pg.inner_text("body")
+    check("claim succeeds and shows on roster", "Jauan Jennings added at $9." in body and "ADDED: POOL BOY · $9" in body.upper(), body[:900])
+    pg.locator("tr:has-text('Jauan Jennings') button:has-text('drop')").last.click(); pg.wait_for_timeout(1000)
+    check("Executive Order blocks same-week drop", "Executive Order" in pg.inner_text("body"))
+    pg.screenshot(path="/home/claude/e2e/claim.png", full_page=True)
+    check("no JS errors (Pool Boy)", not errs, "; ".join(errs))
     # 4. phone width
     ctx = br.new_context(viewport={"width": 390, "height": 844})
     ctx.add_init_script(f"localStorage.setItem('sb-apkzdhweoaeymxynawjx-auth-token', {json.dumps(session_for('pool'))});")
