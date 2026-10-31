@@ -69,7 +69,7 @@ function build2026(){
     const divRank = (divisions[teamDiv[n]].find(x=>x.team===n)||{}).rank;
     teams[n] = {
       name:n, roster:spots.filter(x=>x.status==="active"), taxi:spots.filter(x=>x.status==="taxi"), ir:spots.filter(x=>x.status==="ir"),
-      schedule:rec[n].sched, transactions:[], picks:{"2026":[], "2027":[]},
+      schedule:rec[n].sched, transactions:[], picks:picksFor(tid),
       info:{owners: owner&&owner.display_name, division:teamDiv[n], record:[String(rec[n].w),String(rec[n].l),String(rec[n].t)],
             div_record:[String(rec[n].dw),String(rec[n].dl),String(rec[n].dt)], pf:rec[n].pf.toFixed(2), pa:rec[n].pa.toFixed(2),
             ppg: gp?(rec[n].pf/gp).toFixed(2):"-", standing: divRank?ord(divRank):""},
@@ -85,7 +85,16 @@ function build2026(){
             .map(p=>({name:p.name, nfl:p.nfl_team, pos:p.pos, rookie:p.rookie, salary:p.salary, owner:owner[p.id]||null}))};
   TEAMS = Object.keys(teams).sort();
   SEASON = yr;
+  const yrs = [...new Set(LIVE.picks.map(p=>String(p.draft_year)))].sort();
+  if(yrs.length) PICK_YEARS = yrs.slice(0,2);
   state.week = Math.max(1, ...Object.keys(weeks).map(Number));
+}
+const ORD = n=>n+(["th","st","nd","rd"][(n%100-20)%10]||["th","st","nd","rd"][n%100]||"th");
+const pickLabel = (p, owner)=>`${p.draft_year} ${ORD(p.round)}${p.original_team!==owner?` (${LIVE.teamsById[p.original_team]})`:""}`;
+function picksFor(tid){
+  const out = {}; LIVE.picks.filter(p=>p.owner_team===tid).forEach(p=>{
+    (out[p.draft_year]=out[p.draft_year]||[]).push(ORD(p.round)+(p.original_team!==tid?` (${LIVE.teamsById[p.original_team]})`:"")); });
+  return out;
 }
 // Views that show the 2025 archive keep using it
 ["vHistory","vFinancials","vDraft"].forEach(fn=>{
@@ -158,6 +167,10 @@ async function loadSeason(){
     sb.from("trades").select("*").eq("season",yr).order("created_at",{ascending:false}),
     sb.from("trade_items").select("*")]);
   LIVE.trades = tr.data||[]; LIVE.tradeItems = ti.data||[];
+  const [dp, tp] = await Promise.all([
+    sb.from("draft_picks").select("id,draft_year,round,original_team,owner_team").order("draft_year").order("round"),
+    sb.from("trade_picks").select("*")]);
+  LIVE.picks = dp.data||[]; LIVE.tradePicks = tp.data||[];
   const tdl = await sb.rpc("trade_deadline", {p_season: yr}); LIVE.tradeDeadline = tdl.data;
   const comp = await sb.rpc("team_compliance", {p_season: yr});
   LIVE.compliance = comp.data || [];
@@ -378,7 +391,10 @@ function vMyTeam(){
 function tradeLine(t){
   const items = LIVE.tradeItems.filter(i=>i.trade_id===t.id);
   const side = team=>{ const ps = items.filter(i=>i.from_team===team).map(i=>{const p=LIVE.byId[i.player_id]||{}; return `${esc(p.name)} <span class="mut2 sm">${p.pos||""}</span>`;});
-    const pk = team===t.from_team ? t.picks_from : t.picks_to; if(pk) ps.push(`<span class="sm">${esc(pk)}</span>`); return ps.join(", ")||"—"; };
+    const pk = team===t.from_team ? t.picks_from : t.picks_to; if(pk) ps.push(`<span class="sm">${esc(pk)}</span>`);
+    (LIVE.tradePicks||[]).filter(x=>x.trade_id===t.id && x.from_team===team).forEach(x=>{ const p=LIVE.picks.find(y=>y.id===x.pick_id);
+      if(p) ps.push(`<span class="pill b">${esc(pickLabel(p, team))}</span>`); });
+    return ps.join(", ")||"—"; };
   return `<b>${esc(LIVE.teamsById[t.from_team])}</b> send ${side(t.from_team)} <span class="mut">↔</span> <b>${esc(LIVE.teamsById[t.to_team])}</b> send ${side(t.to_team)}
     ${t.note?`<div class="sm mut">“${esc(t.note)}”</div>`:""}${t.commish_note?`<div class="sm mut">Commissioner: ${esc(t.commish_note)}</div>`:""}`;
 }
@@ -404,8 +420,8 @@ function tradesHTML(){
     <div class="sm mut" style="margin-bottom:8px">${dl} Accepted trades go to the commissioner for approval. Players added in free agency this week can't be traded until next week (Pair of Juggs).</div>
     <div class="flex" style="margin-bottom:10px">Trade with <select onchange="state.tradeTo=this.value;render()">${others.map(([id,n])=>`<option value="${id}" ${+id===+sel?"selected":""}>${esc(n)}</option>`).join("")}</select></div>
     <div class="grid g2">
-      <div><div class="sub" style="margin-bottom:6px">You send</div>${listFor(me,"give")}<input type="text" id="pk_give" placeholder="Picks you send, e.g. 2027 2nd (own)" style="width:100%;margin-top:6px"></div>
-      <div><div class="sub" style="margin-bottom:6px">You get from ${esc(LIVE.teamsById[sel])}</div>${listFor(sel,"get")}<input type="text" id="pk_get" placeholder="Picks you get" style="width:100%;margin-top:6px"></div>
+      <div><div class="sub" style="margin-bottom:6px">You send</div>${listFor(me,"give")}${pickList(me,"givepk")}</div>
+      <div><div class="sub" style="margin-bottom:6px">You get from ${esc(LIVE.teamsById[sel])}</div>${listFor(sel,"get")}${pickList(+sel,"getpk")}</div>
     </div>
     <input type="text" id="tr_note" placeholder="Message (optional)" style="width:100%;margin:10px 0">
     <button class="btn" onclick="proposeTrade(${sel})">Send offer</button>
@@ -416,10 +432,16 @@ function tradesHTML(){
       ${t.from_team===me && ["proposed","accepted"].includes(t.status)?`<button class="btn ghost sm" style="margin-top:4px" onclick="cancelTrade(${t.id})">cancel offer</button>`:""}</div>`).join("") || '<div class="sm mut">No trades yet.</div>'}
   </div>`;
 }
+function pickList(tid, name){
+  const ps = (LIVE.picks||[]).filter(p=>p.owner_team===tid);
+  if(!ps.length) return "";
+  return `<div class="sub" style="margin:8px 0 4px">Draft picks</div><div style="display:flex;flex-wrap:wrap;gap:4px 12px">${ps.map(p=>
+    `<label class="sm"><input type="checkbox" name="${name}" value="${p.id}"> ${esc(pickLabel(p, tid))}</label>`).join("")}</div>`;
+}
 const checked = name=>[...document.querySelectorAll(`input[name=${name}]:checked`)].map(x=>+x.value);
 async function proposeTrade(to){
   const give = checked("give"), get = checked("get");
-  const {error} = await sb.rpc("propose_trade", {p_to_team:+to, p_give:give, p_get:get, p_picks_give:$("#pk_give").value, p_picks_get:$("#pk_get").value, p_note:$("#tr_note").value});
+  const {error} = await sb.rpc("propose_trade", {p_to_team:+to, p_give:give, p_get:get, p_give_picks:checked("givepk"), p_get_picks:checked("getpk"), p_note:$("#tr_note").value});
   if(error) return showErr(error); await loadSeason(); flash(`Offer sent to ${LIVE.teamsById[to]}.`);
 }
 async function respondTrade(id, ok){ const {data,error} = await sb.rpc("respond_trade", {p_trade:id, p_accept:ok}); if(error) return showErr(error); await loadSeason(); flash(data); }

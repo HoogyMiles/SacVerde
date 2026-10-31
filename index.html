@@ -224,6 +224,7 @@ const FINANCIALS = {
  ]
 };
 const CAP = 170;
+let PICK_YEARS = ["2026","2027"];
 let TEAMS = [];
 const PLAYOFF_LABEL = {P1:"Wildcard", P2:"Semifinal", CHAMP:"Title / 3rd Place"};
 
@@ -327,7 +328,7 @@ function vTeams(){
       ${t.taxi.length?`<div class="card" style="margin-top:14px"><h3>Taxi Squad</h3><table>${rosterRows(t.taxi)}</table></div>`:""}
       ${t.ir.length?`<div class="card" style="margin-top:14px"><h3>IR</h3><table>${rosterRows(t.ir)}</table></div>`:""}
       <div class="card" style="margin-top:14px"><h3>Draft Picks</h3>
-        <div class="grid g2">${["2026","2027"].map(y=>`<div><div class="sub" style="margin-bottom:6px">${y}</div>${t.picks[y].map(p=>`<div class="sm" style="padding:3px 0">${esc(p)}</div>`).join("")||'<span class="mut2 sm">—</span>'}</div>`).join("")}</div>
+        <div class="grid g2">${PICK_YEARS.map(y=>`<div><div class="sub" style="margin-bottom:6px">${y}</div>${(t.picks[y]||[]).map(p=>`<div class="sm" style="padding:3px 0">${esc(p)}</div>`).join("")||'<span class="mut2 sm">—</span>'}</div>`).join("")}</div>
       </div>
     </div>
     <div>
@@ -612,7 +613,7 @@ function vHistory(){
 // ---------- FRONT OFFICE ----------
 function vOffice(){
   const rows = TEAMS.map(t=>({t, sal:DATA.teams[t].total_salary, taxi:DATA.teams[t].taxi_salary,
-    p26:DATA.teams[t].picks["2026"].length, p27:DATA.teams[t].picks["2027"].length,
+    p26:(DATA.teams[t].picks[PICK_YEARS[0]]||[]).length, p27:(DATA.teams[t].picks[PICK_YEARS[1]]||[]).length,
     tx:DATA.teams[t].transactions.length})).sort((a,b)=>b.sal-a.sal);
   const maxSal = Math.max(...rows.map(r=>r.sal));
   const allTx = [];
@@ -630,7 +631,7 @@ function vOffice(){
   </div>
   <h2>Draft Capital & Activity</h2>
   <div class="card"><table>
-    <tr><th>Team</th><th class="r">2026 Picks</th><th class="r">2027 Picks</th><th class="r">Taxi $</th><th class="r">2025 Transactions</th></tr>
+    <tr><th>Team</th><th class="r">${PICK_YEARS[0]} Picks</th><th class="r">${PICK_YEARS[1]} Picks</th><th class="r">Taxi $</th><th class="r">${SEASON} Transactions</th></tr>
     ${rows.map(r=>`<tr><td><a ${tgo(r.t)}>${esc(r.t)}</a></td><td class="r">${r.p26}</td><td class="r">${r.p27}</td><td class="r">${money(r.taxi)}</td><td class="r">${r.tx}</td></tr>`).join("")}
   </table></div>
   <h2>Transaction Wire <span class="sub">· all 2025 moves, every team</span></h2>
