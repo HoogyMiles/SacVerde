@@ -321,12 +321,18 @@ function vTeams(){
 
   <div class="grid g2" style="margin-top:14px">
     <div>
-      <div class="card"><h3>Active Roster · ${t.roster.length} players</h3>
+      ${t.lineup?`<div class="card"><h3>Starting Lineup · Week ${t.lineup.week}</h3>
+        <table><tr><th>Slot</th><th>Player</th><th class="r">Salary</th></tr>${t.lineup.starters.map(p=>`<tr><td><b class="sm">${p.slot}</b></td>
+          <td>${p.name?`<span class="pos ${p.pos}">${p.pos}</span> ${esc(p.name)}<div class="sm mut">${p.nfl} · ${p.game}</div>`:'<span class="red sm">Empty</span>'}</td><td class="r">${p.name?money(p.salary):""}</td></tr>`).join("")}</table></div>
+      <div class="card" style="margin-top:14px"><h3>Bench · ${t.lineup.bench.length}</h3>
+        <table><tr><th>Pos</th><th>Player</th><th>NFL</th><th class="r">Salary</th></tr>${rosterRows(t.lineup.bench)}
+        <tr><td></td><td><b>Active total (${t.roster.length} players)</b></td><td></td><td class="r"><b>${money(capUsed)}</b></td></tr></table></div>`
+      :`<div class="card"><h3>Active Roster · ${t.roster.length} players</h3>
         <table><tr><th>Pos</th><th>Player</th><th>NFL</th><th class="r">Salary</th></tr>${rosterRows(sortRoster)}
         <tr><td></td><td><b>Total</b></td><td></td><td class="r"><b>${money(capUsed)}</b></td></tr></table>
-      </div>
-      ${t.taxi.length?`<div class="card" style="margin-top:14px"><h3>Taxi Squad</h3><table>${rosterRows(t.taxi)}</table></div>`:""}
+      </div>`}
       ${t.ir.length?`<div class="card" style="margin-top:14px"><h3>IR</h3><table>${rosterRows(t.ir)}</table></div>`:""}
+      ${t.taxi.length?`<div class="card" style="margin-top:14px"><h3>Taxi Squad</h3><table>${rosterRows(t.taxi)}</table></div>`:""}
       <div class="card" style="margin-top:14px"><h3>Draft Picks</h3>
         <div class="grid g2">${PICK_YEARS.map(y=>`<div><div class="sub" style="margin-bottom:6px">${y}</div>${(t.picks[y]||[]).map(p=>`<div class="sm" style="padding:3px 0">${esc(p)}</div>`).join("")||'<span class="mut2 sm">—</span>'}</div>`).join("")}</div>
       </div>
@@ -1732,5 +1738,6 @@ function render(){
 <script src="rules2026.js"></script>
 <script src="teambg.js"></script>
 <script src="live.js"></script>
+<script src="lineups.js"></script>
 </body>
 </html>

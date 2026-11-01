@@ -154,7 +154,7 @@ function teamTx(name, tid){
       case "add": return `Added ${P(x.player_id)} for $${x.amount}${w}`;
       case "drop": return `Dropped ${P(x.player_id)}${w}`;
       case "forced_drop": return `Penalty drop: ${P(x.player_id)}${w}`;
-      case "forfeit": return `Automatic loss — not cap/roster legal at Sunday 9:55am${w}`;
+      case "forfeit": { const why = [d.over_roster||d.over_cap||!(d.lineup_empty||[]).length ? "not cap/roster legal" : "", (d.lineup_empty||[]).length ? "empty lineup slots ("+d.lineup_empty.join(", ")+")" : ""].filter(Boolean).join(" and "); return `Automatic loss — ${why} at Sunday 9:55am${w}`; }
       case "ir_on": return `Moved ${P(x.player_id)} to IR${w}`;
       case "ir_off": return `Activated ${P(x.player_id)} from IR${w}`;
       case "taxi_promote": return `Promoted ${P(x.player_id)} from the taxi squad${w}`;
@@ -464,7 +464,7 @@ function complianceCard(){
       <td class="red sm">${[c.over_roster?`+${c.over_roster} roster`:"", c.over_cap?`$${c.over_cap} over cap`:""].filter(Boolean).join(" · ")}</td></tr>`).join("")}</table>`
       :`<div class="sm grn">All teams are legal.</div>`}
     ${(LIVE.penalties||[]).length?`<h3 style="margin-top:14px">Penalties</h3><table><tr><th>Wk</th><th>Team</th><th>Penalty</th><th>Forced drops</th>${LIVE.me.role==="commissioner"?"<th>Yahoo</th>":""}</tr>
-      ${LIVE.penalties.map(p=>`<tr><td>${p.week}</td><td>${esc(LIVE.teamsById[p.team_id])}</td><td class="red">Automatic loss</td>
+      ${LIVE.penalties.map(p=>`<tr><td>${p.week}</td><td>${esc(LIVE.teamsById[p.team_id])}</td><td class="red">Automatic loss${p.reason==="lineup"?" · empty lineup ("+(p.lineup_empty||[]).join(", ")+")":p.reason==="cap_roster+lineup"?" · cap/roster + empty lineup":""}</td>
         <td class="sm">${(p.dropped||[]).map(d=>esc(d.name)+" ("+money(d.salary)+")").join(", ")||"—"}</td>
         ${LIVE.me.role==="commissioner"?`<td><label class="sm"><input type="checkbox" ${p.applied_in_yahoo?"checked":""} onchange="markYahoo(${p.id},this.checked)"> entered</label></td>`:""}</tr>`).join("")}</table>`:""}
   </div>`;
@@ -522,7 +522,7 @@ function flashHTML(){ const f=state.flash; if(!f) return ""; state.flash=null; r
 
 // ---------- MY TEAM: roster moves + trades ----------
 function vMyTeam(){
-  return `<h1>My Team · ${esc(state.team)}</h1>
+  return `<h1>My Team · ${esc(LIVE.teamsById[LIVE.me.team_id]||state.team)}</h1>
   <div class="sub">Roster moves and trades. IR: max ${LIVE.season.max_ir}, ${LIVE.season.ir_min_weeks}-week minimum, half salary counts. Taxi: max ${LIVE.season.max_taxi}, rookies only, off the cap.</div>
   ${flashHTML()}${complianceBanner(LIVE.me.team_id)}${alertsHTML()}${myRosterHTML()}
   <h2>Trades</h2>${tradesHTML()}`;
@@ -695,9 +695,9 @@ async function revealWeek(id){
 const NFL_ABBR = ["ARI","ATL","BAL","BUF","CAR","CHI","CIN","CLE","DAL","DEN","DET","GB","HOU","IND","JAX","KC","LAC","LAR","LV","MIA","MIN","NE","NO","NYG","NYJ","PHI","PIT","SEA","SF","TB","TEN","WAS","FA"];
 function adminHTML(){
   const tab = state.adminTab || "results";
-  const tabs = [["results","Scores"],["players","Players & Rosters"],["nfl","NFL Teams"],["picks","Draft Picks"],["logins","Logins"],["email","Email"],["backup","Backup"]];
+  const tabs = [["results","Scores"],["players","Players & Rosters"],...(LIVE.hasLineups?[["lineups","Lineups"]]:[]),["nfl","NFL Teams"],["picks","Draft Picks"],["logins","Logins"],["email","Email"],["backup","Backup"]];
   return `<div class="tabs">${tabs.map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="state.adminTab='${k}';render()">${l}</button>`).join("")}</div>
-  <div class="card">${({results:adminResults, players:adminPlayers, nfl:adminNfl, picks:adminPicks, logins:adminLogins, email:adminEmail, backup:adminBackup})[tab]()}</div>`;
+  <div class="card">${({results:adminResults, players:adminPlayers, lineups:(typeof adminLineups==="function"?adminLineups:adminResults), nfl:adminNfl, picks:adminPicks, logins:adminLogins, email:adminEmail, backup:adminBackup})[tab]()}</div>`;
 }
 async function adminCall(fn, args, after){
   const {data, error} = await sb.rpc(fn, args);
