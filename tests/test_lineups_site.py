@@ -16,7 +16,7 @@ with sync_playwright() as p:
     body = pg.inner_text("body").upper()
     i = [body.find(x) for x in ("STARTING LINEUP · WEEK 8", "BENCH ·", "IR ·", "TAXI SQUAD ·")]
     check("My Team shows Starting Lineup → Bench → IR → Taxi in order", all(x >= 0 for x in i) and i == sorted(i), str(i))
-    check("all 9 slots listed", all(f"\n{s}\t" in body or f"{s}\t" in body for s in ["QB", "RB", "WR", "TE", "W/R/T", "K", "DEF"]))
+    check("all 9 slots listed", pg.locator(".card:has-text('Starting Lineup') .lu-row").count() == 9)
     check("locked starter shows the lock", "🔒" in pg.inner_text(row('Jason Myers')) and "locked" in pg.inner_text(row('Jason Myers')))
     check("bye-week player shows BYE", "BYE" in pg.inner_text(row('Christian McCaffrey')))
     # bench → FLEX via the Move dropdown (swap with Jack Bech)
