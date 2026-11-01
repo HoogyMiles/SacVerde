@@ -305,10 +305,10 @@ function vTeams(){
   const sortRoster = [...t.roster].sort((a,b)=>(POSORD[a.pos]||9)-(POSORD[b.pos]||9)||b.salary-a.salary);
   const rosterRows = r=>r.map(p=>`<tr><td><span class="pos ${p.pos}">${p.pos}</span></td><td>${esc(p.name)}${p.contract?`<span class="badge">${p.contract}yr</span>`:""}</td><td class="mut">${p.nfl}</td><td class="r">${money(p.salary)}</td></tr>`).join("");
   return `
-  <div class="spread"><h1>${esc(state.team)}</h1>
-    <select onchange="state.team=this.value;render()">${TEAMS.map(x=>`<option ${x===state.team?"selected":""}>${esc(x)}</option>`).join("")}</select>
-  </div>
-  <div class="sub">${i.owners?("Manager: "+esc(i.owners)+" · "):""}${i.division||""} ${i.standing?("· "+(SEASON===2025?"Finished ":"Currently ")+i.standing):""}</div>
+  ${(()=>{ const sel = `<select onchange="state.team=this.value;render()">${TEAMS.map(x=>`<option ${x===state.team?"selected":""}>${esc(x)}</option>`).join("")}</select>`;
+    const hero = (typeof teamHero==="function" && SEASON!==2025) ? teamHero(state.team, t, sel, rec(state.team)) : null;
+    return hero || `<div class="spread"><h1>${esc(state.team)}</h1>${sel}</div>
+  <div class="sub">${i.owners?("Manager: "+esc(i.owners)+" · "):""}${i.division||""} ${i.standing?("· "+(SEASON===2025?"Finished ":"Currently ")+i.standing):""}</div>`; })()}
 
   <div class="grid g4" style="margin-top:16px">
     <div class="card stat"><span class="lbl">${SEASON} Record</span><span class="big">${rec(state.team)}</span><span class="sm mut">Division ${ (i.div_record||["-","-"]).slice(0,2).join("-") }</span></div>
@@ -1730,6 +1730,7 @@ function render(){
 </script>
 <script src="supabase.js"></script>
 <script src="rules2026.js"></script>
+<script src="teambg.js"></script>
 <script src="live.js"></script>
 </body>
 </html>
