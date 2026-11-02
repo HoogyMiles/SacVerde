@@ -12,6 +12,12 @@ sql("insert into live_fetches (season, week, status, rows_scored, done_at) value
 # one Yahoo final already in for week 8
 POOL = sql("select id from teams where name='Pool Boy'")
 sql(f"update matchups set home_pts = 120.5, away_pts = 98.25 where season=2026 and week=8 and {POOL} in (home_team, away_team)")
+# forum: a few messages (times relative to the test clock) + reactions
+for i,(team,body,mins) in enumerate([("Pool Boy","8-0 and nobody's even close. Book the bye.",1500),("Juggernauts","Enjoy it while it lasts. Week 9 we see you",1495),
+    ("Milky Wet Hogs","0-7. I'm just here for the forum at this point",1300),("Roaring Hoogy","Bijan already at 7 and it's the first quarter",30),("Roaring Hoogy","diamond hands baby",29),("Steel Curtain","Still cheaper than your whole bench",5)]):
+    sql(f"insert into forum_messages (team_id, author, body, created_at) select id, '00000000-0000-0000-0000-000000000001', {lit(body)}, now() - interval '{mins} minutes' from teams where name={lit(team)}")
+sql("""insert into forum_reactions (message_id, team_id, emoji) select m.id, t.id, '💀' from forum_messages m, teams t where m.body like '0-7%' and t.name in ('Pool Boy','Assassins','Juggernauts')""")
+sql("""insert into forum_reactions (message_id, team_id, emoji) select m.id, t.id, '🔥' from forum_messages m, teams t where m.body like '8-0%' and t.name in ('Pool Boy')""")
 SHOTS = os.environ.get("SHOTS", "/home/claude/e2e")
 
 with sync_playwright() as p:
@@ -91,6 +97,19 @@ with sync_playwright() as p:
     check("backdrop stays in view while scrolling", pg.evaluate("getComputedStyle(document.querySelector('.mt-bg')).position") == "fixed")
     pg.screenshot(path=f"{SHOTS}/myteam_bg_scrolled.png")
     check("no JS errors (my team)", not errs, "; ".join(errs))
+    # ---- Forum (Locker Room) ----
+    pg.evaluate("go('forum')"); pg.wait_for_selector("#chatlog"); pg.wait_for_timeout(800)
+    body = pg.inner_text("main")
+    check("Forum: Locker Room header with live ticker", "LOCKER ROOM" in body and "WK 8" in body and pg.locator(".lr-tick .tk").count() == 6)
+    check("Forum: day dividers and grouped messages", pg.locator(".lr-day").count() >= 2 and pg.locator(".lr-m.cont").count() >= 1)
+    check("Forum: quote of the week = most reacted", "0-7. I'm just here" in pg.inner_text(".lr-side"))
+    check("Forum: your opponent card", "Alligator Arms" in pg.inner_text(".lr-side"))
+    pg.locator(".lr-m:has-text('diamond hands') .add").click(); pg.wait_for_timeout(300)
+    pg.locator(".lr-m:has-text('diamond hands') .rx:has-text('🔥')").click()
+    pg.wait_for_function("[...document.querySelectorAll('.lr-m')].some(m=>m.innerText.includes('diamond hands') && m.querySelector('.rx.on'))", timeout=10000)
+    check("Forum: react via + picker", True)
+    pg.screenshot(path=f"{SHOTS}/forum_new.png")
+    check("no JS errors (forum)", not errs, "; ".join(errs))
     ctx = br.new_context(viewport={"width": 390, "height": 844}); fake_clock(ctx)
     ctx.add_init_script(f"localStorage.setItem('sb-apkzdhweoaeymxynawjx-auth-token', {json.dumps(session_for('hoogy'))});")
     ctx.route("https://apkzdhweoaeymxynawjx.supabase.co/**", lambda r: handle(r, USERS['hoogy'][0]))
@@ -104,6 +123,9 @@ with sync_playwright() as p:
     m.evaluate("go('myteam')"); m.wait_for_timeout(800)
     check("phone My Team: no horizontal page scroll", m.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"))
     m.screenshot(path=f"{SHOTS}/myteam_bg_phone.png")
+    m.evaluate("go('forum')"); m.wait_for_timeout(800)
+    check("phone Forum: no horizontal page scroll", m.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"))
+    m.screenshot(path=f"{SHOTS}/forum_phone.png")
     m.mouse.wheel(0, 1500); m.wait_for_timeout(400); m.screenshot(path=f"{SHOTS}/myteam_bg_phone_scrolled.png")
     check("no JS errors (phone)", not merrs, "; ".join(merrs))
 
