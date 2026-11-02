@@ -29,7 +29,7 @@ async function loadLineups(){
   LIVE.hasLineups = !lu.error && Array.isArray(lu.rows);
   if(!LIVE.hasLineups){ LIVE.lineups = []; return; }
   LIVE.lineups = lu.rows;
-  const g = await sb.from("nfl_games").select("week,home,away,kickoff_at").eq("season",yr).in("week",[...new Set([wk, ...LIVE.lineups.map(l=>l.week)])]);
+  const g = await sb.from("nfl_games").select("week,home,away,kickoff_at").eq("season",yr).in("week",[...new Set([wk, wk-1, ...LIVE.lineups.map(l=>l.week)])]);
   LIVE.games = g.data || [];
 }
 // ---------- live scoring data (migration 021) ----------

@@ -1,0 +1,61 @@
+# Browser checks for the League Home redesign (home.js). Run on a Sunday-afternoon clock so games are live:
+#   TEST_NOW="2026-11-01 21:30:00" TEST=test_home_site.py bash tests/run_all.sh
+import os
+_src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_site.py")).read()
+exec(_src[:_src.index("with sync_playwright() as p:")])
+
+# every week-8 starter gets a stat line so the scoreboard has live totals
+sql("""insert into player_week_stats (season, week, player_id, stats, points)
+  select 2026, 8, l.player_id, '{"rush_yd":10}'::jsonb, round((5 + (l.player_id * 7 % 19))::numeric, 2)
+    from lineups l where l.season = 2026 and l.week = 8 on conflict do nothing""")
+sql("insert into live_fetches (season, week, status, rows_scored, done_at) values (2026, 8, 'ok', 400, now())")
+# one Yahoo final already in for week 8
+POOL = sql("select id from teams where name='Pool Boy'")
+sql(f"update matchups set home_pts = 120.5, away_pts = 98.25 where season=2026 and week=8 and {POOL} in (home_team, away_team)")
+SHOTS = os.environ.get("SHOTS", "/home/claude/e2e")
+
+with sync_playwright() as p:
+    br = p.chromium.launch()
+    pg, errs = page_as(br, "hoogy")
+    pg.evaluate("go('home')"); pg.wait_for_function("document.querySelectorAll('.sb-card').length >= 6", timeout=20000)
+    pg.wait_for_timeout(1200)
+    order = pg.evaluate("[...document.querySelectorAll('main h2')].map(h=>h.innerText.split('·')[0].replace(/[^A-Za-z ]/g,'').trim())")
+    check("Home order: Scoreboard, Standings, Playoff Picture, Franchises", order[:4] == ["Scoreboard", "Standings", "Playoff Picture", "Franchises"], str(order))
+    html = pg.inner_html("main")
+    check("2025 champion box is at the bottom", html.rfind("2025 SACVERDE CHAMPION") > html.find("Franchises"))
+    check("scoreboard opens on week 8 (this week)", "Scoreboard · Week 8" in pg.inner_text("main h2"))
+    cards = pg.locator(".sb-card")
+    check("6 games on the scoreboard", cards.count() == 6)
+    pc = pg.inner_text(".sb-card:has-text('Pool Boy')")
+    check("game with a Yahoo final shows it as Final", "120.50" in pc and "FINAL" in pc.upper(), pc)
+    body = pg.inner_text("main")
+    check("live games show LIVE and live totals", "LIVE" in body.upper() and "yet to play" in body or "playing" in body)
+    hg = sql("select id from teams where name='Roaring Hoogy'")
+    exp = float(sql(f"select points from team_week_points where season=2026 and week=8 and team_id={hg}"))
+    check("Hoogy's live total matches team_week_points", f"{exp:.2f}" in pg.inner_text(".sb-card:has-text('Roaring Hoogy')"), f"{exp:.2f}")
+    check("12 standings rows in 4 division cards", pg.locator(".st-row").count() == 12 and pg.locator(".st-card").count() == 4)
+    check("standings show seed tags", pg.locator(".st-row .tg.bye").count() == 2 and pg.locator(".st-row .tg.wc").count() == 2)
+    check("bracket: 2 byes + 2 wild card games, 2 semis, final + consolation",
+          pg.evaluate("[...document.querySelectorAll('#hmBracket .br-col')].map(c=>c.querySelectorAll('.br-g').length).join(',')") == "4,2,2")
+    check("bracket shows +5 bonus for the higher seed", pg.locator("#hmBracket .b5").count() == 4)
+    check("bracket connectors drawn", pg.locator("#hmBracket .br-join").count() == 3)
+    # Wednesday flip: MNF Mon Nov 2 5:15 PM PT -> flips Wed Nov 4 12:00 AM PT (08:00 UTC); PDT case too
+    check("week flips Wednesday 12:00 AM PT (PST)", pg.evaluate("hmWednesdayAfter(Date.parse('2026-11-03T01:15:00Z')).toISOString()") == "2026-11-04T08:00:00.000Z")
+    check("week flips Wednesday 12:00 AM PT (PDT)", pg.evaluate("hmWednesdayAfter(Date.parse('2026-09-15T00:15:00Z')).toISOString()") == "2026-09-16T07:00:00.000Z")
+    pg.select_option(".hm-h2 select", "7"); pg.wait_for_timeout(500)
+    check("week dropdown shows past finals", "Scoreboard · Week 7" in pg.inner_text("main h2") and "FINAL" in pg.inner_text(".sb-card").upper())
+    pg.select_option(".hm-h2 select", "8"); pg.wait_for_timeout(500)
+    pg.screenshot(path=f"{SHOTS}/home_desktop.png", full_page=True)
+    pg.click(".sb-card:has-text('Roaring Hoogy')"); pg.wait_for_timeout(500)
+    check("clicking a game opens Matchup Center", "Matchup Center" in pg.inner_text("main h1"))
+    check("no JS errors (home)", not errs, "; ".join(errs))
+    ctx = br.new_context(viewport={"width": 390, "height": 844}); fake_clock(ctx)
+    ctx.add_init_script(f"localStorage.setItem('sb-apkzdhweoaeymxynawjx-auth-token', {json.dumps(session_for('hoogy'))});")
+    ctx.route("https://apkzdhweoaeymxynawjx.supabase.co/**", lambda r: handle(r, USERS['hoogy'][0]))
+    m = ctx.new_page(); merrs = []; m.on("pageerror", lambda e: merrs.append(str(e)))
+    m.goto("http://localhost:8080/index.html"); m.wait_for_function("document.querySelectorAll('.sb-card').length >= 6", timeout=30000); m.wait_for_timeout(1200)
+    check("phone: no horizontal page scroll", m.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"))
+    m.screenshot(path=f"{SHOTS}/home_phone.png", full_page=True)
+    check("no JS errors (phone)", not merrs, "; ".join(merrs))
+
+print(f"\n{sum(1 for _,ok in results if ok)}/{len(results)} passed")
