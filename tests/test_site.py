@@ -275,7 +275,7 @@ with sync_playwright() as p:
     pg.evaluate("go('rules')"); pg.wait_for_timeout(400); body = pg.inner_text("body")
     check("Rules page shows 2026 rules (Tuesday deadline, 14 games)", "Rules · 2026" in body and "Tuesday" in body and "Wednesday Tuesday" not in body)
     pg.evaluate("go('match'); state.week=8; render()"); pg.wait_for_timeout(300); body = pg.inner_text("body")
-    check("Matchup Center shows real week 8 finals", "Final" in body and "Matchup Center" in body)
+    check("Matchup Center shows real week 8 finals", "FINAL" in body.upper() and "Matchup Center" in body)
     pg.evaluate("go('teams'); state.team=\"K2's Kings\"; render()"); pg.wait_for_timeout(300); body = pg.inner_text("body")
     check("Team page shows sheet transaction history", "K2s send Zay Flowers to da bombers" in body)
     pg.evaluate("go('office'); state.adminTab='players'; state.adminQ='Romeo Doubs'; render()"); pg.wait_for_timeout(300)

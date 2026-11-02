@@ -27,10 +27,10 @@ with sync_playwright() as p:
     check("starter row shows his points (QB 18.00)", "18.00" in pg.inner_text(f".lu-row[data-pid='{qbid}']"))
     pg.evaluate("go('match'); state.week=8; render()"); pg.wait_for_function("document.body.innerText.toUpperCase().includes('LIVE SCORING · WEEK 8')", timeout=20000)
     pg.wait_for_timeout(800)
-    card = pg.inner_text(".card:has(h3:has-text('Roaring Hoogy'))")
-    check("Matchup Center shows the site total next to the Yahoo final", f"{expected:.2f}" in card and "Yahoo final:" in card and ("101.50" in card or "99.25" in card), card[:300])
+    card = pg.inner_text("main")
+    check("Matchup Center opens on my game and shows the site total next to the Yahoo final", "ROARING HOOGY" in pg.inner_text(".mc-head").upper() and f"{expected:.2f}" in card and "Yahoo" in card and ("101.50" in card or "99.25" in card), card[:300])
     check("Matchup Center shows player points", "18.00" in card)
-    check("says the site score is unofficial", "Unofficial" in pg.inner_text("body"))
+    check("says the site score is unofficial", "UNOFFICIAL" in pg.inner_text("body").upper())
     pg.screenshot(path="/home/claude/e2e/match_live.png", full_page=True)
     # Admin → Live Scoring
     pg.evaluate("go('office'); state.adminTab='live'; state.liveAdmin=null; render()")
@@ -48,7 +48,7 @@ with sync_playwright() as p:
     check("no JS errors (live scoring)", not errs, "; ".join(errs))
     # a manager sees totals but no admin tab
     pg, errs = page_as(br, "tritons")
-    pg.evaluate("go('match'); state.week=8; render()"); pg.wait_for_timeout(800)
+    pg.evaluate(f"openMatch(8, LIVE.m26.filter(m=>m.week===8).findIndex(m=>[m.home_team,m.away_team].includes({HOOGY})))"); pg.wait_for_timeout(800)
     check("other managers see live totals", f"{expected:.2f}" in pg.inner_text("body"))
     check("no JS errors (manager)", not errs, "; ".join(errs))
     # fallback: 020 run but 021 not run

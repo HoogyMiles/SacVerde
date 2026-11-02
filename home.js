@@ -278,8 +278,8 @@ function hmJoin(){
   // byes feed the semifinal directly
   [c0[0], c0[3]].forEach(b=>b && b.classList.add("out"));
 }
-new MutationObserver(()=>{ if(state.view==="home") requestAnimationFrame(hmJoin); }).observe(document.querySelector("main")||document.body, {childList:true});
-window.addEventListener("resize", ()=>{ if(state.view==="home") hmJoin(); });
+new MutationObserver(()=>{ if(document.getElementById("hmBracket")) requestAnimationFrame(hmJoin); }).observe(document.querySelector("main")||document.body, {childList:true});
+window.addEventListener("resize", ()=>{ if(document.getElementById("hmBracket")) hmJoin(); });
 
 // ---------- franchises + champion (bottom) ----------
 function hmBottom(){

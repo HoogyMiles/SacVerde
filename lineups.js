@@ -62,8 +62,8 @@ function playerLive(p, week){
 // refresh points every minute while games are on (Matchup Center / My Team / team pages)
 setInterval(async ()=>{
   try{
-    if(!LIVE.season || !LIVE.hasScoring || !["match","myteam","teams"].includes(state.view)) return;
-    const wk = state.view==="match" ? +(state.week || LIVE.season.current_week) : LIVE.season.current_week;
+    if(!LIVE.season || !LIVE.hasScoring || !["myteam","teams"].includes(state.view)) return;
+    const wk = LIVE.season.current_week;
     if(!gamesLive(wk)) return;
     const a = document.activeElement; if(a && /SELECT|INPUT|TEXTAREA/.test(a.tagName)) return;
     await loadPoints(wk); if(LIVE.roster26.length) build2026(); render();

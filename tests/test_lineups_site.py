@@ -61,7 +61,7 @@ with sync_playwright() as p:
     pg.screenshot(path="/home/claude/e2e/team_lineup.png", full_page=True)
     pg.evaluate("go('match'); state.week=8; render()"); pg.wait_for_timeout(400)
     body = pg.inner_text("body")
-    check("Matchup Center shows both lineups for week 8", ("LINEUPS · WEEK 8" in body.upper() or "LIVE SCORING · WEEK 8" in body.upper()) and body.count("W/R/T") >= 12)
+    check("Matchup Center shows both lineups for week 8", "LIVE SCORING · WEEK 8" in body.upper() and pg.locator(".mc-lr:not(.hd):not(.tot)").count() == 9 and "W/R/T" in body)
     pg.screenshot(path="/home/claude/e2e/match_lineups.png", full_page=True)
     pg.evaluate("go('myteam')"); pg.wait_for_timeout(400)
     pg.screenshot(path="/home/claude/e2e/myteam_lineup_pr.png", full_page=True)
