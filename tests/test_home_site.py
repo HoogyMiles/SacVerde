@@ -83,6 +83,11 @@ with sync_playwright() as p:
     pg.evaluate("go('financials')"); pg.wait_for_timeout(300)
     check("old Financials link lands in Teams → Financials", "Weekly High Scores" in pg.inner_text("main"))
     check("no JS errors (nav)", not errs, "; ".join(errs))
+    # ---- My Team backdrop ----
+    pg.evaluate("go('myteam')"); pg.wait_for_timeout(800)
+    check("My Team shows the team's art as a backdrop", pg.locator(".mt-wrap .mt-bg .tbg-stage").count() == 1)
+    pg.screenshot(path=f"{SHOTS}/myteam_bg.png")
+    check("no JS errors (my team)", not errs, "; ".join(errs))
     ctx = br.new_context(viewport={"width": 390, "height": 844}); fake_clock(ctx)
     ctx.add_init_script(f"localStorage.setItem('sb-apkzdhweoaeymxynawjx-auth-token', {json.dumps(session_for('hoogy'))});")
     ctx.route("https://apkzdhweoaeymxynawjx.supabase.co/**", lambda r: handle(r, USERS['hoogy'][0]))
@@ -93,6 +98,9 @@ with sync_playwright() as p:
     m.evaluate("state.mgi=null; state.matchWeek=null; state.mTab='live'; go('match')"); m.wait_for_timeout(1200)
     check("phone Matchup Center: no horizontal page scroll", m.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"))
     m.screenshot(path=f"{SHOTS}/match_phone.png", full_page=True)
+    m.evaluate("go('myteam')"); m.wait_for_timeout(800)
+    check("phone My Team: no horizontal page scroll", m.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"))
+    m.screenshot(path=f"{SHOTS}/myteam_bg_phone.png")
     check("no JS errors (phone)", not merrs, "; ".join(merrs))
 
 print(f"\n{sum(1 for _,ok in results if ok)}/{len(results)} passed")
