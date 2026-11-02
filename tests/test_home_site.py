@@ -87,6 +87,9 @@ with sync_playwright() as p:
     pg.evaluate("go('myteam')"); pg.wait_for_timeout(800)
     check("My Team shows the team's art as a backdrop", pg.locator(".mt-wrap .mt-bg .tbg-stage").count() == 1)
     pg.screenshot(path=f"{SHOTS}/myteam_bg.png")
+    pg.mouse.wheel(0, 1400); pg.wait_for_timeout(400)
+    check("backdrop stays in view while scrolling", pg.evaluate("getComputedStyle(document.querySelector('.mt-bg')).position") == "fixed")
+    pg.screenshot(path=f"{SHOTS}/myteam_bg_scrolled.png")
     check("no JS errors (my team)", not errs, "; ".join(errs))
     ctx = br.new_context(viewport={"width": 390, "height": 844}); fake_clock(ctx)
     ctx.add_init_script(f"localStorage.setItem('sb-apkzdhweoaeymxynawjx-auth-token', {json.dumps(session_for('hoogy'))});")
@@ -101,6 +104,7 @@ with sync_playwright() as p:
     m.evaluate("go('myteam')"); m.wait_for_timeout(800)
     check("phone My Team: no horizontal page scroll", m.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"))
     m.screenshot(path=f"{SHOTS}/myteam_bg_phone.png")
+    m.mouse.wheel(0, 1500); m.wait_for_timeout(400); m.screenshot(path=f"{SHOTS}/myteam_bg_phone_scrolled.png")
     check("no JS errors (phone)", not merrs, "; ".join(merrs))
 
 print(f"\n{sum(1 for _,ok in results if ok)}/{len(results)} passed")

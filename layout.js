@@ -25,14 +25,14 @@ window.goTeam = function(t){ state.teamsTab = "teams"; return _goTeamPrev(t); };
 // ---------- My Team: the team's art as a page backdrop ----------
 document.head.insertAdjacentHTML("beforeend", `<style>
 .mt-wrap{position:relative;isolation:isolate}
-.mt-bg{position:absolute;top:-26px;left:-20px;right:-20px;height:560px;z-index:-1;overflow:hidden;pointer-events:none;border-radius:0 0 18px 18px}
-.mt-bg .tbg-stage{opacity:.9}
+.mt-bg{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+.mt-bg .tbg-stage{top:auto;bottom:0;transform-origin:bottom right;opacity:.9}
 .mt-bg:after{content:"";position:absolute;inset:0;background:
-  linear-gradient(180deg,rgba(10,10,11,.15) 0%,rgba(10,10,11,.35) 45%,var(--bg) 100%),
+  linear-gradient(180deg,rgba(10,10,11,.55) 0%,rgba(10,10,11,.2) 55%,rgba(10,10,11,.35) 100%),
   linear-gradient(90deg,rgba(10,10,11,.85) 0%,rgba(10,10,11,.35) 45%,transparent 70%)}
 .mt-wrap .card{background:rgba(20,20,22,.86);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .mt-wrap > h1{text-shadow:0 2px 12px rgba(0,0,0,.8)}
-@media (max-width:600px){ .mt-bg{left:-16px;right:-16px;height:460px} .mt-bg:after{background:linear-gradient(180deg,rgba(10,10,11,.35) 0%,rgba(10,10,11,.6) 50%,var(--bg) 100%)} }
+@media (max-width:600px){ .mt-bg:after{background:linear-gradient(180deg,rgba(10,10,11,.6) 0%,rgba(10,10,11,.45) 60%,rgba(10,10,11,.3) 100%)} }
 </style>`);
 function teamBackdrop(name){
   try{
