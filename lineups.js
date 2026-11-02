@@ -14,6 +14,7 @@ document.head.insertAdjacentHTML("beforeend", `<style>
 .lu-p{flex:1 1 200px;min-width:0}
 .lu-sub{font-size:12px;color:var(--mut);margin-top:2px}
 .lu-sal{width:44px;text-align:right}
+.lu-pts{width:62px;text-align:right;font-weight:700}
 .lu-act{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 .lu-act select{width:150px}
 @media (max-width:600px){ .lu-act{width:100%} .lu-act select{width:auto;flex:1;max-width:200px} }
@@ -31,8 +32,48 @@ async function loadLineups(){
   const g = await sb.from("nfl_games").select("week,home,away,kickoff_at").eq("season",yr).in("week",[...new Set([wk, ...LIVE.lineups.map(l=>l.week)])]);
   LIVE.games = g.data || [];
 }
+// ---------- live scoring data (migration 021) ----------
+LIVE.pts = {};          // week -> {player_id: {points, stats, updated_at}}
+async function loadPoints(week){
+  if(!LIVE.hasScoring) return;
+  const rows = await fetchAll(()=>sb.from("player_week_stats").select("player_id,points,stats,updated_at").eq("season",LIVE.season.year).eq("week",week).order("player_id"));
+  const m = {}; rows.forEach(r=>m[r.player_id]=r); LIVE.pts[week] = m;
+}
+async function loadScoring(){
+  const yr = LIVE.season.year;
+  const lf = await sb.from("live_fetches").select("week,requested_at,done_at,status,http_status,rows_scored,message").eq("season",yr).order("id",{ascending:false}).limit(1);
+  LIVE.hasScoring = !lf.error;
+  if(!LIVE.hasScoring) return;
+  LIVE.lastFetch = (lf.data||[])[0] || null;
+  const weeks = new Set([LIVE.season.current_week]); if(state.week) weeks.add(+state.week);
+  await Promise.all([...weeks].map(loadPoints));
+}
+const ptsOf = (pid, week)=>{ const r = (LIVE.pts[week]||{})[pid]; return r ? +r.points : null; };
+const teamTotal = (tid, week)=>{ const m = lineupMap(tid, week); return Object.values(m).reduce((s,pid)=>s+(ptsOf(pid, week)||0),0); };
+const fmtPts = v=>v==null ? "–" : (+v).toFixed(2);
+function gamesLive(week){
+  const now = Date.now();
+  return (LIVE.games||[]).some(g=>g.week===week && new Date(g.kickoff_at).getTime() <= now && now < new Date(g.kickoff_at).getTime() + 4.5*3600e3);
+}
+function playerLive(p, week){
+  const g = gameFor(p, week); if(!g) return false;
+  const t = new Date(g.ko).getTime(), now = Date.now(); return t <= now && now < t + 4*3600e3;
+}
+// refresh points every minute while games are on (Matchup Center / My Team / team pages)
+setInterval(async ()=>{
+  try{
+    if(!LIVE.season || !LIVE.hasScoring || !["match","myteam","teams"].includes(state.view)) return;
+    const wk = state.view==="match" ? +(state.week || LIVE.season.current_week) : LIVE.season.current_week;
+    if(!gamesLive(wk)) return;
+    const a = document.activeElement; if(a && /SELECT|INPUT|TEXTAREA/.test(a.tagName)) return;
+    await loadPoints(wk); if(LIVE.roster26.length) build2026(); render();
+  }catch(e){}
+}, 60000);
+
 const _loadSeason = loadSeason;
-loadSeason = async function(){ await _loadSeason(); try { await loadLineups(); } catch(e){ LIVE.hasLineups = false; LIVE.lineups = []; } };
+loadSeason = async function(){ await _loadSeason();
+  try { await loadLineups(); } catch(e){ LIVE.hasLineups = false; LIVE.lineups = []; }
+  try { if(LIVE.hasLineups) await loadScoring(); else LIVE.hasScoring = false; } catch(e){ LIVE.hasScoring = false; } };
 
 function gameFor(p, week){
   if(!p || p.nfl_team==="FA") return null;
@@ -122,12 +163,13 @@ myRosterHTML = function(){
     <div class="lu-slot">${slotLbl}</div>
     <div class="lu-p">${r?`<span class="pos ${r.p.pos}">${r.p.pos}</span> ${esc(r.p.name)}<div class="lu-sub">${r.p.nfl_team} · ${gameCell(r.p, wk)}</div>`:`<span class="red sm">Empty</span>`}</div>
     <div class="lu-sal">${r?money(r.salary):""}</div>
+    ${LIVE.hasScoring?`<div class="lu-pts">${r?`${playerLive(r.p, wk)?'<span class="live-dot"></span>':""}${fmtPts(ptsOf(r.player_id, wk))}`:""}</div>`:""}
     <div class="lu-act">${moves?moveSelect(me, wk, r, fromSlot):""}${r&&!r.gone?btns(r):""}</div></div>`;
   const sect = (title, rows)=>`<div class="card" style="margin-top:14px"><h3>${title}</h3>${rows}</div>`;
   return `<div class="card" style="margin-top:14px"><h3>Your ${LIVE.season.year} Roster · ${cap.count}/${LIVE.season.roster_size} active · ${money(cap.used)} of $${LIVE.season.salary_cap}</h3>
       <div class="sm mut">Week ${wk} lineup. Players lock at their game's kickoff. No changes → last week's lineup carries over.</div></div>
     ${warn}
-    ${sect(`Starting Lineup · Week ${wk}`, s.starters.map(x=>row(SLOT_LABEL[x.slot], x.r, x.slot, true)).join(""))}
+    ${sect(`Starting Lineup · Week ${wk}${LIVE.hasScoring?` · ${fmtPts(teamTotal(me, wk))} pts`:""}`, s.starters.map(x=>row(SLOT_LABEL[x.slot], x.r, x.slot, true)).join(""))}
     ${sect(`Bench · ${s.bench.length}`, s.bench.map(r=>row("BN", r, null, true)).join("") || `<div class="sm mut2">Nobody on the bench.</div>`)}
     ${s.ir.length?sect(`IR · ${s.ir.length}/${LIVE.season.max_ir}`, s.ir.map(r=>row("IR", r, null, false)).join("")):""}
     ${s.taxi.length?sect(`Taxi Squad · ${s.taxi.length}/${LIVE.season.max_taxi}`, s.taxi.map(r=>row("TAXI", r, null, false)).join("")):""}`;
@@ -154,14 +196,22 @@ window.vMatch = function(){
   const weeks = [...new Set(LIVE.m26.map(m=>m.week))].sort((a,b)=>a-b);
   const wk = +(state.week || weeks[0]);
   if(!LIVE.lineups.some(l=>l.week===wk)) return html + `<div class="sm mut2" style="margin-top:12px">Lineups are tracked on the site starting week ${Math.min(...LIVE.lineups.map(l=>l.week).concat([LIVE.season.current_week]))}.</div>`;
+  if(LIVE.hasScoring && !LIVE.pts[wk]){ loadPoints(wk).then(()=>{ if(state.view==="match") render(); }); }
   const side = tid=>{ const s = teamSections(tid, wk);
-    return `<table>${s.starters.map(x=>`<tr><td class="sm"><b>${SLOT_LABEL[x.slot]}</b></td><td>${x.r?esc(x.r.p.name):'<span class="red sm">Empty</span>'}</td>
-      <td class="sm mut">${x.r?x.r.p.nfl_team:""}</td><td class="r sm mut2">–</td></tr>`).join("")}</table>`; };
-  const games = LIVE.m26.filter(m=>m.week===wk);
-  return html + `<h2>Lineups · Week ${wk}</h2><div class="sub">Player points fill in here once live scoring is connected.</div>
+    return `<table>${s.starters.map(x=>{ const live = x.r && playerLive(x.r.p, wk), pts = x.r ? ptsOf(x.r.player_id, wk) : null;
+      return `<tr><td class="sm"><b>${SLOT_LABEL[x.slot]}</b></td><td>${x.r?esc(x.r.p.name):'<span class="red sm">Empty</span>'}</td>
+      <td class="sm mut">${x.r?x.r.p.nfl_team+(gameFor(x.r.p, wk)?"":" · BYE"):""}</td>
+      <td class="r ${pts!=null?"":"mut2"}">${live?'<span class="live-dot"></span>':""}${LIVE.hasScoring?fmtPts(pts):"–"}</td></tr>`; }).join("")}</table>`; };
+  const games = LIVE.m26.filter(m=>m.week===wk), live = gamesLive(wk);
+  const head = (tid, other, yahoo)=>{ const t = teamTotal(tid, wk), o = teamTotal(other, wk);
+    return `<div class="spread"><h3>${esc(LIVE.teamsById[tid])}</h3>${LIVE.hasScoring?`<span class="big ${t>o?"grn":""}">${t.toFixed(2)}</span>`:""}</div>
+      ${yahoo!=null?`<div class="sm mut">Yahoo final: <b>${(+yahoo).toFixed(2)}</b></div>`:""}`; };
+  const lf = LIVE.lastFetch;
+  return html + `<h2>${live?'<span class="live-dot"></span>':""}Live Scoring · Week ${wk}</h2>
+    <div class="sub">${LIVE.hasScoring?`Site scoring from live NFL stats (SacVerde rules). Unofficial — Yahoo's final is official for now.${live?" Updates every minute.":""}${lf&&lf.done_at?` Last stats update ${new Date(lf.done_at).toLocaleTimeString([], {...PT, hour:"numeric", minute:"2-digit"})} PT.`:""}`:"Player points fill in here once live scoring is connected."}</div>
     ${games.map(m=>`<div class="card" style="margin-top:12px"><div class="grid g2">
-      <div><h3>${esc(LIVE.teamsById[m.home_team])}</h3>${side(m.home_team)}</div>
-      <div><h3>${esc(LIVE.teamsById[m.away_team])}</h3>${side(m.away_team)}</div></div></div>`).join("")}`;
+      <div>${head(m.home_team, m.away_team, m.home_pts)}${side(m.home_team)}</div>
+      <div>${head(m.away_team, m.home_team, m.away_pts)}${side(m.away_team)}</div></div></div>`).join("")}`;
 };
 
 // ---------- Front Office: lineup compliance ----------
@@ -193,4 +243,48 @@ function adminLineups(){
     ${SLOTS.map(([slot,lbl])=>{ const opts = spots.filter(s=>slotFits(slot, s.p.pos));
       return `<tr><td><b>${lbl}${slot.match(/\d/)?" "+slot.slice(-1):""}</b></td><td><select id="al_${slot}"><option value="">— empty —</option>${opts.map(s=>`<option value="${s.player_id}" ${m[slot]===s.player_id?"selected":""}>${esc(s.p.name)} · ${s.p.nfl_team}${s.status!=="active"?" · "+s.status.toUpperCase():""}</option>`).join("")}</select></td>
         <td><button class="btn sm" onclick="adminCall('admin_set_lineup',{p_team:${tid},p_week:${wk},p_slot:'${slot}',p_player:$('#al_${slot}').value?+$('#al_${slot}').value:null})">Save</button></td></tr>`; }).join("")}</table>`;
+}
+
+// ---------- Admin → Live Scoring (tab added in live.js adminHTML when 021 is run) ----------
+async function loadLiveAdmin(){
+  const yr = LIVE.season.year, wk = LIVE.season.current_week;
+  const [um, rules, lf, linked] = await Promise.all([
+    sb.from("sleeper_unmatched").select("*").eq("season",yr).order("points",{ascending:false}).limit(60),
+    sb.from("scoring_rules").select("*").order("sort"),
+    sb.from("live_fetches").select("*").eq("season",yr).order("id",{ascending:false}).limit(8),
+    fetchAll(()=>sb.from("players").select("id,sleeper_id").not("sleeper_id","is",null).order("id"))]);
+  state.liveAdmin = {unmatched: um.data||[], rules: rules.data||[], fetches: lf.data||[], linked: new Set((linked||[]).map(x=>x.id))};
+  if(state.view==="office" && state.adminTab==="live") render();
+}
+function adminLive(){
+  const A = state.liveAdmin; if(!A){ loadLiveAdmin(); return `<div class="sm mut">Loading…</div>`; }
+  const t = d=>d?new Date(d).toLocaleString([], {...PT, weekday:"short", hour:"numeric", minute:"2-digit"}):"";
+  const rostered = LIVE.roster26.map(r=>LIVE.byId[r.player_id]).filter(p=>p && !A.linked.has(p.id));
+  return `<div class="flex" style="flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      <button class="btn sm" onclick="adminCall('admin_live_fetch',{},()=>setTimeout(()=>{state.liveAdmin=null;loadSeason().then(render)},8000))">Fetch stats now</button>
+      <button class="btn ghost sm" onclick="state.liveAdmin=null;render()">Refresh</button>
+      <span class="sm mut">Stats come from Sleeper automatically every minute while games are on, then every 30 min for 2 days (stat corrections).</span></div>
+    <h3>Recent fetches</h3><table><tr><th>Week</th><th>Asked</th><th>Status</th><th class="r">Players scored</th><th>Note</th></tr>
+      ${A.fetches.map(f=>`<tr><td>${f.week}</td><td class="sm">${t(f.requested_at)}</td><td class="${f.status==="error"?"red":f.status==="ok"?"grn":""} sm">${f.status}${f.http_status?" ("+f.http_status+")":""}</td><td class="r">${f.rows_scored??""}</td><td class="sm mut">${esc(f.message||"")}</td></tr>`).join("")||'<tr><td colspan="5" class="sm mut2">No fetches yet.</td></tr>'}</table>
+    <h3 style="margin-top:16px">Sleeper players we couldn't match · ${A.unmatched.length}</h3>
+    <div class="sm mut" style="margin-bottom:6px">Scored on Sleeper but not found on the salary list by name + position. Link the ones that matter.</div>
+    <datalist id="svplayers">${LIVE.players.filter(p=>p.active).map(p=>`<option value="${esc(p.name)} · ${p.pos} · ${p.nfl_team}">`).join("")}</datalist>
+    <table><tr><th>Wk</th><th>Sleeper player</th><th class="r">Pts</th><th>Link to</th><th></th></tr>
+      ${A.unmatched.map(u=>`<tr><td>${u.week}</td><td>${esc(u.name)} <span class="sm mut">${u.pos} · ${u.team||""} · id ${esc(u.sleeper_id)}</span></td><td class="r">${fmtPts(u.points)}</td>
+        <td><input list="svplayers" id="lk_${esc(u.sleeper_id)}" placeholder="Type a name…" style="width:220px"></td>
+        <td><button class="btn sm" onclick="linkSleeper('${esc(u.sleeper_id)}')">Link</button></td></tr>`).join("")||'<tr><td colspan="5" class="sm grn">Nothing unmatched.</td></tr>'}</table>
+    <details style="margin-top:12px"><summary class="sm">Rostered players not linked to Sleeper yet · ${rostered.length}</summary>
+      <div class="sm mut" style="margin-top:6px">They link automatically the first time they record a stat. Still unlinked after their game? Find them above.</div>
+      <div class="sm" style="margin-top:6px">${rostered.map(p=>esc(p.name)+" ("+p.pos+", "+p.nfl_team+")").join(" · ")||"All linked."}</div></details>
+    <h3 style="margin-top:16px">Scoring rules</h3>
+    <div class="sm mut" style="margin-bottom:6px">From the 2026 rules doc (with Defensive Dogos and K2point). Changing one re-scores the current week.</div>
+    <table><tr><th>Rule</th><th class="r">Points</th><th></th></tr>
+      ${A.rules.map(r=>`<tr><td>${esc(r.label)}</td><td class="r"><input type="number" step="0.01" id="sr_${r.stat}" value="${r.points}" style="width:80px"></td>
+        <td><button class="btn ghost sm" onclick="adminCall('admin_set_scoring_rule',{p_stat:'${r.stat}',p_points:+$('#sr_${r.stat}').value},()=>{state.liveAdmin=null})">Save</button></td></tr>`).join("")}</table>`;
+}
+function linkSleeper(sid){
+  const v = ($("#lk_"+CSS.escape(sid)).value||"").split(" · ");
+  const p = LIVE.players.find(x=>x.active && x.name===v[0] && (!v[1] || x.pos===v[1]) && (!v[2] || x.nfl_team===v[2]));
+  if(!p) return showErr("Pick a player from the list.");
+  adminCall("admin_link_sleeper", {p_player:p.id, p_sleeper_id:sid}, ()=>{ state.liveAdmin=null; });
 }

@@ -117,6 +117,7 @@ def session_for(who):
 
 def page_as(br, who):
     ctx = br.new_context(viewport={"width": 1280, "height": 900})
+    fake_clock(ctx)
     uid = USERS[who][0] if who else None
     if who:
         ctx.add_init_script(f"localStorage.setItem('sb-apkzdhweoaeymxynawjx-auth-token', {json.dumps(session_for(who))});")
@@ -128,6 +129,11 @@ def page_as(br, who):
     if who: pg.wait_for_function("document.querySelector('#nav') && document.querySelector('#nav').innerText.includes('sign out')", timeout=30000)
     pg.wait_for_timeout(500)
     return pg, errs
+
+def fake_clock(ctx):   # browser clock matches the database's fixed test clock (run_all.sh TEST_NOW)
+    import os, datetime
+    t = os.environ.get("TEST_NOW")
+    if t: ctx.clock.install(time=datetime.datetime.fromtimestamp(float(sql("select extract(epoch from now())")), datetime.timezone.utc))
 
 results = []
 def check(name, cond, extra=""):
@@ -299,7 +305,7 @@ with sync_playwright() as p:
     check("backup downloads", dl.value.suggested_filename.startswith("sacverde-backup-"))
     check("no JS errors (admin)", not errs, "; ".join(errs))
     # 7. phone width
-    ctx = br.new_context(viewport={"width": 390, "height": 844})
+    ctx = br.new_context(viewport={"width": 390, "height": 844}); fake_clock(ctx)
     ctx.add_init_script(f"localStorage.setItem('sb-apkzdhweoaeymxynawjx-auth-token', {json.dumps(session_for('pool'))});")
     ctx.route("https://apkzdhweoaeymxynawjx.supabase.co/**", lambda r: handle(r, USERS['pool'][0]))
     m = ctx.new_page(); m.goto("http://localhost:8080/index.html")

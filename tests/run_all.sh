@@ -1,7 +1,11 @@
 #!/bin/bash
 # start local postgres, rebuild DB with all migrations, seed test users/bids, serve site, run browser test
 pg_isready -h /tmp/pg -p 5433 -q || rm -f /tmp/pg/data/postmaster.pid
-pg_isready -h /tmp/pg -p 5433 -q || su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /tmp/pg/data -l /tmp/pg/log -o '-k /tmp/pg -p 5433' start" >/dev/null 2>&1; sleep 2
+# Tests run on a fixed clock: Saturday Oct 31 2026, 8:10 PM PT (week 8, before Sunday's games), so they give the
+# same answer any day. Override with TEST_NOW="YYYY-MM-DD HH:MM:SS" (UTC). Needs: apt-get install faketime
+export TEST_NOW="${TEST_NOW:-2026-11-01 03:10:00}"
+if [ "$(cat /tmp/pg/faketime 2>/dev/null)" != "$TEST_NOW" ]; then su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /tmp/pg/data -m fast stop" >/dev/null 2>&1; sleep 1; fi
+pg_isready -h /tmp/pg -p 5433 -q || { su postgres -c "LD_PRELOAD=/usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1 FAKETIME='@$TEST_NOW' TZ=UTC /usr/lib/postgresql/16/bin/pg_ctl -D /tmp/pg/data -l /tmp/pg/log -o '-k /tmp/pg -p 5433' start" >/dev/null 2>&1; echo "$TEST_NOW" > /tmp/pg/faketime; sleep 2; }
 P="psql -h /tmp/pg -p 5433 -U postgres -v ON_ERROR_STOP=1 -q"
 $P -c "drop database if exists sv" -c "create database sv" >/dev/null
 for f in /home/claude/repo/tests/000_local_supabase_stub.sql /home/claude/repo/db/0*.sql; do $P -d sv -f $f 2>&1 | grep -i error; done

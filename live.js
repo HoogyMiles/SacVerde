@@ -695,9 +695,9 @@ async function revealWeek(id){
 const NFL_ABBR = ["ARI","ATL","BAL","BUF","CAR","CHI","CIN","CLE","DAL","DEN","DET","GB","HOU","IND","JAX","KC","LAC","LAR","LV","MIA","MIN","NE","NO","NYG","NYJ","PHI","PIT","SEA","SF","TB","TEN","WAS","FA"];
 function adminHTML(){
   const tab = state.adminTab || "results";
-  const tabs = [["results","Scores"],["players","Players & Rosters"],...(LIVE.hasLineups?[["lineups","Lineups"]]:[]),["nfl","NFL Teams"],["picks","Draft Picks"],["logins","Logins"],["email","Email"],["backup","Backup"]];
+  const tabs = [["results","Scores"],["players","Players & Rosters"],...(LIVE.hasLineups?[["lineups","Lineups"]]:[]),...(LIVE.hasScoring?[["live","Live Scoring"]]:[]),["nfl","NFL Teams"],["picks","Draft Picks"],["logins","Logins"],["email","Email"],["backup","Backup"]];
   return `<div class="tabs">${tabs.map(([k,l])=>`<button class="${tab===k?'on':''}" onclick="state.adminTab='${k}';render()">${l}</button>`).join("")}</div>
-  <div class="card">${({results:adminResults, players:adminPlayers, lineups:(typeof adminLineups==="function"?adminLineups:adminResults), nfl:adminNfl, picks:adminPicks, logins:adminLogins, email:adminEmail, backup:adminBackup})[tab]()}</div>`;
+  <div class="card">${({results:adminResults, players:adminPlayers, lineups:(typeof adminLineups==="function"?adminLineups:adminResults), live:(typeof adminLive==="function"?adminLive:adminResults), nfl:adminNfl, picks:adminPicks, logins:adminLogins, email:adminEmail, backup:adminBackup})[tab]()}</div>`;
 }
 async function adminCall(fn, args, after){
   const {data, error} = await sb.rpc(fn, args);
