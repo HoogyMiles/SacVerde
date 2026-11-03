@@ -161,7 +161,7 @@ myRosterHTML = function(){
   const btns = r=>`${rosterButtons(r)}<button class="btn ghost sm" onclick="dropPlayer(${r.player_id})">drop</button>`;
   const row = (slotLbl, r, fromSlot, moves)=>`<div class="lu-row" data-pid="${r?r.player_id:""}" data-slot="${fromSlot||""}">
     <div class="lu-slot">${slotLbl}</div>
-    <div class="lu-p">${r?`<span class="pos ${r.p.pos}">${r.p.pos}</span> ${esc(r.p.name)}<div class="lu-sub">${r.p.nfl_team} · ${gameCell(r.p, wk)}</div>`:`<span class="red sm">Empty</span>`}</div>
+    <div class="lu-p">${r?`<span class="pos ${r.p.pos}">${r.p.pos}</span> ${plLink(r.p.name,r.p.pos,r.player_id)}<div class="lu-sub">${r.p.nfl_team} · ${gameCell(r.p, wk)}</div>`:`<span class="red sm">Empty</span>`}</div>
     <div class="lu-sal">${r?money(r.salary):""}</div>
     ${LIVE.hasScoring?`<div class="lu-pts">${r?`${playerLive(r.p, wk)?'<span class="live-dot"></span>':""}${fmtPts(ptsOf(r.player_id, wk))}`:""}</div>`:""}
     <div class="lu-act">${moves?moveSelect(me, wk, r, fromSlot):""}${r&&!r.gone?btns(r):""}</div></div>`;
@@ -263,6 +263,7 @@ function adminLive(){
   return `<div class="flex" style="flex-wrap:wrap;gap:8px;margin-bottom:10px">
       <button class="btn sm" onclick="adminCall('admin_live_fetch',{},()=>setTimeout(()=>{state.liveAdmin=null;loadSeason().then(render)},8000))">Fetch stats now</button>
       <button class="btn ghost sm" onclick="state.liveAdmin=null;render()">Refresh</button>
+      <button class="btn ghost sm" onclick="liveBackfill()">Load past weeks (1–${LIVE.season.current_week-1})</button>
       <span class="sm mut">Stats come from Sleeper automatically every minute while games are on, then every 30 min for 2 days (stat corrections).</span></div>
     <h3>Recent fetches</h3><table><tr><th>Week</th><th>Asked</th><th>Status</th><th class="r">Players scored</th><th>Note</th></tr>
       ${A.fetches.map(f=>`<tr><td>${f.week}</td><td class="sm">${t(f.requested_at)}</td><td class="${f.status==="error"?"red":f.status==="ok"?"grn":""} sm">${f.status}${f.http_status?" ("+f.http_status+")":""}</td><td class="r">${f.rows_scored??""}</td><td class="sm mut">${esc(f.message||"")}</td></tr>`).join("")||'<tr><td colspan="5" class="sm mut2">No fetches yet.</td></tr>'}</table>
@@ -287,4 +288,12 @@ function linkSleeper(sid){
   const p = LIVE.players.find(x=>x.active && x.name===v[0] && (!v[1] || x.pos===v[1]) && (!v[2] || x.nfl_team===v[2]));
   if(!p) return showErr("Pick a player from the list.");
   adminCall("admin_link_sleeper", {p_player:p.id, p_sleeper_id:sid}, ()=>{ state.liveAdmin=null; });
+}
+
+// Fetch Sleeper stats for every past week so player cards show SacVerde points for the whole season
+async function liveBackfill(){
+  const cw = LIVE.season.current_week; if(cw<=1) return;
+  if(!confirm(`Fetch player stats for weeks 1–${cw-1}? Takes a few minutes to process.`)) return;
+  for(let w=1; w<cw; w++){ const {error} = await sb.rpc("admin_live_fetch", {p_week:w}); if(error) return showErr(error); }
+  flash(`Requested weeks 1–${cw-1}. Points fill in over the next few minutes.`); state.liveAdmin=null; render();
 }

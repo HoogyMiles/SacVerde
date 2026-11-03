@@ -377,7 +377,7 @@ vBids = function(){
   </div>
   ${mine.length?`<div class="card" style="margin-bottom:14px"><h3>Your Sealed Bids · Week ${w.week} (${mine.length})</h3>
     <table><tr><th>Pos</th><th>Player</th><th class="r">Salary</th><th class="r">Your Bid</th><th>Saved</th><th></th></tr>
-    ${mine.sort((a,b)=>b.amount-a.amount).map(b=>`<tr><td><span class="pos ${b.p.pos}">${b.p.pos}</span></td><td>${esc(b.p.name)}</td><td class="r">${money(b.p.salary)}</td><td class="r"><b>${money(b.amount)}</b></td><td class="sm mut">${fmtPT(b.updated_at)}</td>
+    ${mine.sort((a,b)=>b.amount-a.amount).map(b=>`<tr><td><span class="pos ${b.p.pos}">${b.p.pos}</span></td><td>${plLink(b.p.name,b.p.pos,b.player_id)}</td><td class="r">${money(b.p.salary)}</td><td class="r"><b>${money(b.amount)}</b></td><td class="sm mut">${fmtPT(b.updated_at)}</td>
       <td>${open?`<button class="btn ghost sm" onclick="withdrawBid(${b.player_id})">withdraw</button>`:""}</td></tr>`).join("")}
     </table></div>`:""}
   ${open?`
@@ -388,7 +388,7 @@ vBids = function(){
   <div class="card"><h3>Free Agents · top 60 by salary (search to find anyone)</h3>
   <table><tr><th>Pos</th><th>Player</th><th>NFL</th><th class="r">Salary</th><th class="r">Min Bid</th><th class="r">Bid</th></tr>
   ${fas.map(p=>{const b=LIVE.myBids[p.id]; const mb=minBid(p.salary);
-    return `<tr><td><span class="pos ${p.pos}">${p.pos}</span></td><td>${esc(p.name)}${p.rookie?'<span class="badge">R</span>':""}</td><td class="mut">${p.nfl_team}</td>
+    return `<tr><td><span class="pos ${p.pos}">${p.pos}</span></td><td>${plLink(p.name,p.pos,p.id)}${p.rookie?'<span class="badge">R</span>':""}</td><td class="mut">${p.nfl_team}</td>
     <td class="r">${money(p.salary)}</td><td class="r mut">${money(mb)}</td>
     <td class="r"><input type="number" min="${mb}" step="1" style="width:70px" value="${b?b.amount:""}" placeholder="${mb}" onchange="placeBid(${p.id},this.value)"></td></tr>`;}).join("")}
   </table></div>`:""}
@@ -427,7 +427,7 @@ function revealHTML(){
   return `<div class="note">Week ${w.week} reveal · bids closed ${fmtPT(w.bids_close_at)}. Priority = highest bid; ties go to the team lower in the standings. Only teams that bid on a player can add him, at their own bid. Thursday-game players use the Thursday 12pm / 4pm windows. All times PT.</div>
   ${flashHTML()}
   <div class="grid g2">${cards.map(c=>`<div class="card">
-    <div class="spread"><div><span class="pos ${c.p.pos}">${c.p.pos}</span> <b>${esc(c.p.name)}</b> <span class="sm mut">${c.p.nfl_team} · list ${money(c.p.salary)}</span></div>
+    <div class="spread"><div><span class="pos ${c.p.pos}">${c.p.pos}</span> <b>${plLink(c.p.name,c.p.pos,c.p.id)}</b> <span class="sm mut">${c.p.nfl_team} · list ${money(c.p.salary)}</span></div>
       ${c.owner?`<span class="pill g">ADDED: ${esc(LIVE.teamsById[c.owner.team_id])} · ${money(c.owner.salary)}</span>`:""}</div>
     <table style="margin-top:8px">${c.rows.map(b=>`<tr><td>${b.priority<=3?`<span class="pill ${b.priority===1?'g':'b'}">#${b.priority}</span>`:`<span class="sm mut2">#${b.priority}</span>`}</td>
       <td>${esc(LIVE.teamsById[b.team_id])}</td><td class="r"><b>${money(b.amount)}</b></td><td class="sm mut">${winTxt(b)}</td></tr>
@@ -502,7 +502,7 @@ function myRosterHTML(){
   if(!rows.length) return "";
   return `<div class="card" style="margin-top:14px"><h3>Your ${LIVE.season.year} Roster · ${cap.count}/${LIVE.season.roster_size} active · ${money(cap.used)} of $${LIVE.season.salary_cap}</h3>
     <div style="overflow-x:auto"><table><tr><th>Pos</th><th>Player</th><th>NFL</th><th class="r">Salary</th><th></th></tr>
-    ${rows.map(r=>`<tr><td><span class="pos ${r.p.pos}">${r.p.pos}</span></td><td>${esc(r.p.name)}${r.status!=="active"?` <span class="badge">${r.status.toUpperCase()}</span>`:""}</td><td class="mut">${r.p.nfl_team}</td>
+    ${rows.map(r=>`<tr><td><span class="pos ${r.p.pos}">${r.p.pos}</span></td><td>${plLink(r.p.name,r.p.pos,r.player_id)}${r.status!=="active"?` <span class="badge">${r.status.toUpperCase()}</span>`:""}</td><td class="mut">${r.p.nfl_team}</td>
       <td class="r">${money(r.salary)}</td><td class="r">${rosterButtons(r)}<button class="btn ghost sm" onclick="dropPlayer(${r.player_id})">drop</button></td></tr>`).join("")}
     </table></div></div>`;
 }

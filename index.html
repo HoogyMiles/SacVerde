@@ -303,7 +303,7 @@ function vTeams(){
   const t = DATA.teams[state.team], i=t.info, h=t.history;
   const capUsed = t.total_salary;
   const sortRoster = [...t.roster].sort((a,b)=>(POSORD[a.pos]||9)-(POSORD[b.pos]||9)||b.salary-a.salary);
-  const rosterRows = r=>r.map(p=>`<tr><td><span class="pos ${p.pos}">${p.pos}</span></td><td>${esc(p.name)}${p.contract?`<span class="badge">${p.contract}yr</span>`:""}</td><td class="mut">${p.nfl}</td><td class="r">${money(p.salary)}</td></tr>`).join("");
+  const rosterRows = r=>r.map(p=>`<tr><td><span class="pos ${p.pos}">${p.pos}</span></td><td>${typeof plLink==="function"&&SEASON>2025?plLink(p.name,p.pos):esc(p.name)}${p.contract?`<span class="badge">${p.contract}yr</span>`:""}</td><td class="mut">${p.nfl}</td><td class="r">${money(p.salary)}</td></tr>`).join("");
   return `
   ${(()=>{ const sel = `<select onchange="state.team=this.value;render()">${TEAMS.map(x=>`<option ${x===state.team?"selected":""}>${esc(x)}</option>`).join("")}</select>`;
     const hero = (typeof teamHero==="function" && SEASON!==2025) ? teamHero(state.team, t, sel, rec(state.team)) : null;
@@ -323,7 +323,7 @@ function vTeams(){
     <div>
       ${t.lineup?`<div class="card"><h3>Starting Lineup · Week ${t.lineup.week}</h3>
         <table><tr><th>Slot</th><th>Player</th><th class="r">Salary</th></tr>${t.lineup.starters.map(p=>`<tr><td><b class="sm">${p.slot}</b></td>
-          <td>${p.name?`<span class="pos ${p.pos}">${p.pos}</span> ${esc(p.name)}<div class="sm mut">${p.nfl} · ${p.game}</div>`:'<span class="red sm">Empty</span>'}</td><td class="r">${p.name?money(p.salary):""}</td></tr>`).join("")}</table></div>
+          <td>${p.name?`<span class="pos ${p.pos}">${p.pos}</span> ${typeof plLink==="function"&&SEASON>2025?plLink(p.name,p.pos):esc(p.name)}<div class="sm mut">${p.nfl} · ${p.game}</div>`:'<span class="red sm">Empty</span>'}</td><td class="r">${p.name?money(p.salary):""}</td></tr>`).join("")}</table></div>
       <div class="card" style="margin-top:14px"><h3>Bench · ${t.lineup.bench.length}</h3>
         <table><tr><th>Pos</th><th>Player</th><th>NFL</th><th class="r">Salary</th></tr>${rosterRows(t.lineup.bench)}
         <tr><td></td><td><b>Active total (${t.roster.length} players)</b></td><td></td><td class="r"><b>${money(capUsed)}</b></td></tr></table></div>`
@@ -1743,5 +1743,6 @@ function render(){
 <script src="matchup.js"></script>
 <script src="layout.js"></script>
 <script src="forum.js"></script>
+<script src="player.js"></script>
 </body>
 </html>
