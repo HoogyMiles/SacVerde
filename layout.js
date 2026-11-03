@@ -26,7 +26,7 @@ window.goTeam = function(t){ state.teamsTab = "teams"; return _goTeamPrev(t); };
 document.head.insertAdjacentHTML("beforeend", `<style>
 .mt-wrap{position:relative;isolation:isolate}
 .mt-bg{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
-.mt-bg .tbg-stage{top:auto;bottom:0;transform-origin:bottom right;opacity:.9}
+.mt-bg .tbg-stage{top:auto;bottom:0;transform-origin:bottom right;opacity:.9;-webkit-mask-image:radial-gradient(ellipse 58% 62% at 50% 50%,#000 60%,transparent 100%);mask-image:radial-gradient(ellipse 58% 62% at 50% 50%,#000 60%,transparent 100%)}
 .mt-bg:after{content:"";position:absolute;inset:0;background:
   linear-gradient(180deg,rgba(10,10,11,.55) 0%,rgba(10,10,11,.2) 55%,rgba(10,10,11,.35) 100%),
   linear-gradient(90deg,rgba(10,10,11,.6) 0%,rgba(10,10,11,.2) 45%,transparent 70%)}
@@ -66,3 +66,24 @@ if(typeof _vMyTeamPrev==="function") window.vMyTeam = function(){
   const bg = teamBackdrop(LIVE.teamsById[LIVE.me.team_id]);
   return bg ? `<div class="mt-wrap" style="--mt-txt:${mtText(LIVE.teamsById[LIVE.me.team_id])}">${bg}${html}</div>` : html;
 };
+
+// Center the team art in the visible area (each design sits in a different spot on its 1200x520 canvas)
+function mtCenter(){
+  const bg = document.querySelector(".mt-bg"), st = bg && bg.querySelector(".tbg-stage"); if(!st) return;
+  st.style.cssText = "left:0;top:0;right:auto;bottom:auto;transform:none;transform-origin:0 0";
+  const base = st.getBoundingClientRect(); let x1 = 1e9, y1 = 1e9, x2 = -1e9, y2 = -1e9;
+  st.querySelectorAll("*").forEach((el, i)=>{ if(el.parentElement===st && i===0) return;   // skip the full-canvas background layer
+    const r = el.getBoundingClientRect(); if(!r.width || !r.height || r.width>=base.width*0.98) return;
+    const l = Math.max(r.left, base.left), t = Math.max(r.top, base.top), rr = Math.min(r.right, base.right), b = Math.min(r.bottom, base.bottom);
+    if(rr<=l || b<=t) return; x1 = Math.min(x1, l); y1 = Math.min(y1, t); x2 = Math.max(x2, rr); y2 = Math.max(y2, b); });
+  if(x1>x2){ x1 = base.left; y1 = base.top; x2 = base.right; y2 = base.bottom; }
+  const hdr = document.querySelector("header"), top = hdr ? hdr.getBoundingClientRect().bottom : 0;
+  const W = window.innerWidth, H = window.innerHeight - top, bw = x2-x1, bh = y2-y1;
+  const s = Math.min(1.15, (W*0.92)/bw, (H*0.9)/bh);
+  const cx = (x1+x2)/2 - base.left, cy = (y1+y2)/2 - base.top;
+  st.style.transform = `translate(${W/2 - cx*s}px, ${top + H/2 - cy*s}px) scale(${s})`;
+  const m = `radial-gradient(ellipse ${Math.round(bw/2*1.15)}px ${Math.round(bh/2*1.2)}px at ${Math.round(cx)}px ${Math.round(cy)}px,#000 62%,transparent 100%)`;
+  st.style.webkitMaskImage = m; st.style.maskImage = m;
+}
+new MutationObserver(()=>{ if(document.querySelector(".mt-bg")) requestAnimationFrame(mtCenter); }).observe(document.querySelector("main")||document.body, {childList:true});
+window.addEventListener("resize", ()=>{ if(document.querySelector(".mt-bg")) mtCenter(); });
