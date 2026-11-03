@@ -27,7 +27,8 @@ document.head.insertAdjacentHTML("beforeend", `<style>
 /* standings: broadcast bars */
 .st-grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(460px,1fr))}
 .st-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.st-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:linear-gradient(90deg,var(--dc1,var(--green)),var(--dc2,#7a120d));font-family:Anton,Impact,sans-serif;font-size:19px;letter-spacing:1px;text-transform:uppercase;color:var(--dt,#fff);border-bottom:3px solid var(--dt,transparent)}
+.st-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:linear-gradient(90deg,var(--dc1,var(--green)),var(--dc2,#7a120d));font-family:Anton,Impact,sans-serif;font-size:23px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dt,#fff);border-bottom:3px solid var(--dt,transparent);text-shadow:var(--ds,0 2px 0 rgba(0,0,0,.5))}
+.st-head span:first-child{-webkit-text-stroke:.6px var(--dk,transparent)}
 .st-head span:last-child{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;font-size:10px;font-weight:700;opacity:.9;letter-spacing:1px}
 .st-row{display:grid;grid-template-columns:46px minmax(0,1fr) 54px 40px 96px 74px 34px;align-items:center;gap:8px;padding:10px 12px 10px 0;border-top:1px solid var(--line);
   border-left:5px solid var(--c);background:linear-gradient(90deg,var(--b) 0%,transparent 58%);cursor:pointer;transition:transform .15s,background-color .15s}
@@ -82,7 +83,7 @@ document.head.insertAdjacentHTML("beforeend", `<style>
   .st-row{grid-template-columns:36px minmax(0,1fr) 46px 64px 30px;padding-right:8px}
   .st-row .st-div,.st-row .st-dots{display:none}
   .st-rk{font-size:22px} .st-rec{font-size:20px}
-  .st-head{font-size:16px} .st-head span:last-child{display:none}
+  .st-head{font-size:19px} .st-head span:last-child{display:none}
   .sb-grid{grid-template-columns:1fr}
 }
 </style>`);
@@ -191,7 +192,10 @@ const hmLoading = {};
 // Division banner colors (Hoogs 11/2): [banner, banner shade, lettering]
 const HM_DIV = {"Sailgating Syndicate":["#46247A","#2c1450","#FFC72C"], "Trojan Tears":["#2D68C4","#1d4a91","#F2A900"],
                 "Da Choads":["#F56600","#c44f00","#522D80"], "Thunderdome":["#00274C","#001a33","#FFCB05"]};
-const hmDivStyle = d=>{ const c = HM_DIV[d]; return c ? `--dc1:${c[0]};--dc2:${c[1]};--dt:${c[2]}` : ""; };
+// gold on dark: dark drop shadow + soft glow; purple on orange: light edge so it lifts off the orange
+const HM_DIV_FX = {"Da Choads":["0 1px 0 rgba(255,255,255,.55),0 2px 6px rgba(255,255,255,.35)","#3a1d5e"]};
+const hmDivStyle = d=>{ const c = HM_DIV[d]; if(!c) return ""; const fx = HM_DIV_FX[d] || [`0 2px 0 rgba(0,0,0,.6),0 0 12px ${c[2]}55`, "rgba(0,0,0,.35)"];
+  return `--dc1:${c[0]};--dc2:${c[1]};--dt:${c[2]};--ds:${fx[0]};--dk:${fx[1]}`; };
 function hmStandings(){
   const pp = (SEASON>2025 && typeof playoffPicture==="function") ? playoffPicture() : null;
   const seedOf = {}; (pp?pp.seeds:[]).forEach(s=>seedOf[s.team]=s.seed);
