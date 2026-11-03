@@ -87,3 +87,26 @@ function mtCenter(){
 }
 new MutationObserver(()=>{ if(document.querySelector(".mt-bg")) requestAnimationFrame(mtCenter); }).observe(document.querySelector("main")||document.body, {childList:true});
 window.addEventListener("resize", ()=>{ if(document.querySelector(".mt-bg")) mtCenter(); });
+
+// ---------- Sac Verde logo (full version) — League Home backdrop ----------
+function sacLogoSVG(tagline){
+  const G="#1FA05A", CR="#F2EBDA", SI="#C8CDD3", CH="#1A1C1E";
+  const lines = Array.from({length:9}, (_,k)=>`<rect x="${40+k*65}" y="40" width="3" height="300" fill="${SI}"/>`).join("");
+  const laces = [-14,-5,5,14].map(x=>`<line x1="${x}" y1="-5" x2="${x}" y2="5" stroke="${CH}" stroke-width="2.5" stroke-linecap="round"/>`).join("");
+  return `<svg viewBox="0 0 600 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sac Verde"><g opacity=".14">${lines}</g><g transform="translate(300,0)">
+    <text x="-205" y="92" font-family="Graduate,Georgia,serif" font-size="44" fill="${CR}" letter-spacing="6">SAC</text>
+    <g transform="translate(-10,78)"><path d="M-38,0 Q0,-28 38,0 Q0,28 -38,0Z" fill="${SI}"/><line x1="-17" y1="0" x2="17" y2="0" stroke="${CH}" stroke-width="2.5" stroke-linecap="round"/>${laces}</g>
+    <g transform="rotate(-6)"><text x="0" y="250" text-anchor="middle" font-family="Yellowtail,'Brush Script MT',cursive" font-size="190" fill="${G}" stroke="${CR}" stroke-width="5" paint-order="stroke">Verde</text>
+    <path d="M-200,300 C-80,270 60,268 230,250 C150,280 40,300 -60,312Z" fill="${G}" stroke="${CR}" stroke-width="3"/></g>
+    ${tagline?`<text x="0" y="380" text-anchor="middle" font-family="Oswald,Impact,sans-serif" font-weight="700" font-size="18" fill="${SI}" letter-spacing="9">${tagline}</text>`:""}</g></svg>`;
+}
+document.head.insertAdjacentHTML("beforeend", `<style>
+.hm-wrap{position:relative;isolation:isolate}
+.hm-bg{position:fixed;inset:0;z-index:-1;pointer-events:none;display:flex;align-items:center;justify-content:center;padding-top:80px;
+  background:radial-gradient(ellipse at 50% 55%,#151a17 0%,#0a0a0b 70%)}
+.hm-bg svg{width:min(1100px,92vw);height:auto;opacity:.16;filter:saturate(.9)}
+.hm-wrap .card,.hm-wrap .sb-card,.hm-wrap .st-card,.hm-wrap .br-wrap,.hm-wrap .tcard{background-color:rgba(20,20,22,.86);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+@media (max-width:600px){ .hm-bg svg{width:130vw;opacity:.13} }
+</style>`);
+(function(){ const prev = window.vHome; window.vHome = function(){ const html = prev(); if(!html) return html;
+  return `<div class="hm-wrap"><div class="hm-bg" aria-hidden="true">${sacLogoSVG("FANTASY FOOTBALL · KEEPER LEAGUE")}</div>${html}</div>`; }; })();

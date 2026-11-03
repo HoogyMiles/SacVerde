@@ -24,7 +24,7 @@ const UDOM = "@users.sacverde.app";
 function vLogin(note, mode){
   mode = mode || state.loginMode || "in"; state.loginMode = mode;
   const box = inner=>`<div class="card" style="max-width:420px;margin:60px auto;text-align:center">
-    <h1 style="margin-bottom:6px">SacVerde League</h1>${note?`<div class="note" id="loginnote">${note}</div>`:""}${inner}</div>`;
+    ${(()=>{ const l = document.querySelector("header .logo svg"); return l ? `<div style="display:flex;justify-content:center;margin:4px 0 14px">${l.outerHTML.replace(/width="230" height="73"/,'width="310" height="98"')}</div><h1 style="position:absolute;left:-9999px">SacVerde League</h1>` : '<h1 style="margin-bottom:6px">SacVerde League</h1>'; })()}${note?`<div class="note" id="loginnote">${note}</div>`:""}${inner}</div>`;
   const inp = (id,type,ph,enter)=>`<input type="${type}" id="${id}" placeholder="${ph}" autocomplete="${type==="password"?(mode==="new"?"new-password":"current-password"):"username"}" style="width:100%;margin-bottom:10px"${enter?` onkeydown="if(event.key==='Enter')${enter}()"`:""}>`;
   const lnk = (m,t)=>`<a onclick="state.loginMode='${m}';$('#app').innerHTML=vLogin()">${t}</a>`;
   if(mode==="new") return box(`<div class="sub" style="margin-bottom:16px">Pick a username and password. You'll need the 6-character team code the commissioner sent you — it's only used once.</div>
