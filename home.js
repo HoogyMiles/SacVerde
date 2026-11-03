@@ -27,8 +27,8 @@ document.head.insertAdjacentHTML("beforeend", `<style>
 /* standings: broadcast bars */
 .st-grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(460px,1fr))}
 .st-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.st-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:linear-gradient(90deg,var(--green),#7a120d);font-family:Anton,Impact,sans-serif;font-size:19px;letter-spacing:1px;text-transform:uppercase;color:#fff}
-.st-head span:last-child{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;font-size:10px;font-weight:700;opacity:.85;letter-spacing:1px}
+.st-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:linear-gradient(90deg,var(--dc1,var(--green)),var(--dc2,#7a120d));font-family:Anton,Impact,sans-serif;font-size:19px;letter-spacing:1px;text-transform:uppercase;color:var(--dt,#fff);border-bottom:3px solid var(--dt,transparent)}
+.st-head span:last-child{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;font-size:10px;font-weight:700;opacity:.9;letter-spacing:1px}
 .st-row{display:grid;grid-template-columns:46px minmax(0,1fr) 54px 40px 96px 74px 34px;align-items:center;gap:8px;padding:10px 12px 10px 0;border-top:1px solid var(--line);
   border-left:5px solid var(--c);background:linear-gradient(90deg,var(--b) 0%,transparent 58%);cursor:pointer;transition:transform .15s,background-color .15s}
 .st-row:hover{transform:translateX(4px);background-color:#18181b}
@@ -188,6 +188,10 @@ function hmScoreboard(){
 const hmLoading = {};
 
 // ---------- standings ----------
+// Division banner colors (Hoogs 11/2): [banner, banner shade, lettering]
+const HM_DIV = {"Sailgating Syndicate":["#46247A","#2c1450","#FFC72C"], "Trojan Tears":["#2D68C4","#1d4a91","#F2A900"],
+                "Da Choads":["#F56600","#c44f00","#522D80"], "Thunderdome":["#00274C","#001a33","#FFCB05"]};
+const hmDivStyle = d=>{ const c = HM_DIV[d]; return c ? `--dc1:${c[0]};--dc2:${c[1]};--dt:${c[2]}` : ""; };
 function hmStandings(){
   const pp = (SEASON>2025 && typeof playoffPicture==="function") ? playoffPicture() : null;
   const seedOf = {}; (pp?pp.seeds:[]).forEach(s=>seedOf[s.team]=s.seed);
@@ -200,7 +204,7 @@ function hmStandings(){
     const last = sc.slice(-5).map(g=>g.result.toLowerCase());
     let k = 0; const r = sc.length ? sc[sc.length-1].result : ""; for(let i=sc.length-1;i>=0 && sc[i].result===r;i--) k++;
     return {dots: last.map(x=>`<i class="${x}"></i>`).join(""), streak: r ? r+k : "", sk: r.toLowerCase()}; };
-  const card = (d, ts)=>`<div class="st-card"><div class="st-head"><span>${esc(d)}</span><span>W-L · DIV · PF · LAST 5</span></div>
+  const card = (d, ts)=>`<div class="st-card"><div class="st-head" style="${hmDivStyle(d)}"><span>${esc(d)}</span><span>W-L · DIV · PF · LAST 5</span></div>
     ${ts.map(x=>{ const n = clean(x.team), f = form(n), tie = +x.t ? "-"+x.t : "", dtie = +x.dt ? "-"+x.dt : "";
       return `<div class="st-row" style="${hmVars(n)}" ${tgo(T(n))}><div class="st-rk">${x.rank}</div>
         <div class="st-nm"><b>${esc(n)}</b>${tag(x)}</div>
