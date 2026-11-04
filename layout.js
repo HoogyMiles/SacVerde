@@ -109,4 +109,4 @@ document.head.insertAdjacentHTML("beforeend", `<style>
 @media (max-width:600px){ .hm-bg svg{width:130vw;opacity:.13} }
 </style>`);
 (function(){ const prev = window.vHome; window.vHome = function(){ const html = prev(); if(!html) return html;
-  return `<div class="hm-wrap"><div class="hm-bg" aria-hidden="true">${sacLogoSVG("FANTASY FOOTBALL · KEEPER LEAGUE")}</div>${html}</div>`; }; })();
+  return `<div class="hm-wrap"><div class="hm-bg" aria-hidden="true">${sacLogoSVG("FANTASY FOOTBALL · EST. 2003")}</div>${html}</div>`; }; })();
