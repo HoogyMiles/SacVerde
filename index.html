@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SacVerde Fantasy Football League</title>
+<title>Sac Verde Fantasy Football League</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Graduate&family=Yellowtail&family=Oswald:wght@700&display=swap">
 <style>
 :root{
   /* GameStop palette: black / red / white */
@@ -16,7 +19,7 @@ body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSys
 a{color:var(--green);text-decoration:none;cursor:pointer}
 header{position:sticky;top:0;z-index:50;background:#111114;border-bottom:1px solid var(--line)}
 .hwrap{max-width:1200px;margin:0 auto;padding:0 20px;display:flex;align-items:center;gap:24px;flex-wrap:wrap}
-.logo{display:flex;align-items:center;gap:10px;padding:14px 0;font-weight:800;font-size:20px;letter-spacing:.5px}
+.logo{display:flex;align-items:center;padding:6px 0;cursor:pointer;line-height:0}
 .logo .sv{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,var(--green),#7a100c);display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;font-weight:900}
 .logo em{font-style:normal;color:var(--green)}
 nav{display:flex;gap:2px;flex-wrap:wrap}
@@ -59,7 +62,7 @@ td.r,th.r{text-align:right}
 .btn.ghost{background:transparent;color:var(--green);border:1px solid var(--green-dim)}
 .btn.sm{padding:5px 10px;font-size:12px}
 .btn:disabled{opacity:.4;cursor:default}
-select,input[type=text],input[type=number]{background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:8px 10px;border-radius:8px;font-size:14px}
+select,input[type=text],input[type=number],input[type=password],input[type=search]{background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:8px 10px;border-radius:8px;font-size:14px}
 input[type=number]{width:76px}
 .tabs{display:flex;gap:8px;margin:14px 0;flex-wrap:wrap}
 .tabs button{background:var(--panel2);border:1px solid var(--line);color:var(--mut);padding:7px 14px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer}
@@ -169,7 +172,12 @@ input[type=number]{width:76px}
 </head>
 <body>
 <header><div class="hwrap">
-  <div class="logo"><span class="sv">SV</span>SAC<em>VERDE</em></div>
+  <a class="logo" onclick="go('home')" aria-label="Sac Verde home"><svg viewBox="0 0 240 76" width="230" height="73" role="img" aria-label="Sac Verde">
+<g opacity=".11"><rect x="4" y="0" width="1.4" height="76" fill="#C8CDD3"/><rect x="33" y="0" width="1.4" height="76" fill="#C8CDD3"/><rect x="62" y="0" width="1.4" height="76" fill="#C8CDD3"/><rect x="91" y="0" width="1.4" height="76" fill="#C8CDD3"/><rect x="120" y="0" width="1.4" height="76" fill="#C8CDD3"/><rect x="149" y="0" width="1.4" height="76" fill="#C8CDD3"/><rect x="178" y="0" width="1.4" height="76" fill="#C8CDD3"/><rect x="207" y="0" width="1.4" height="76" fill="#C8CDD3"/><rect x="236" y="0" width="1.4" height="76" fill="#C8CDD3"/></g>
+<text x="10" y="21" font-family="Graduate,Georgia,serif" font-size="19" fill="#F2EBDA" letter-spacing="3">SAC</text>
+<g transform="translate(96,14)"><path d="M-15,0 Q0,-10 15,0 Q0,10 -15,0Z" fill="#C8CDD3"/><line x1="-5.5" y1="0" x2="5.5" y2="0" stroke="#1A1C1E" stroke-width="1.5"/><line x1="-3" y1="-2.4" x2="-3" y2="2.4" stroke="#1A1C1E" stroke-width="1.2"/><line x1="0" y1="-2.4" x2="0" y2="2.4" stroke="#1A1C1E" stroke-width="1.2"/><line x1="3" y1="-2.4" x2="3" y2="2.4" stroke="#1A1C1E" stroke-width="1.2"/></g>
+<g transform="rotate(-6 120 50)"><text x="118" y="64" text-anchor="middle" font-family="Yellowtail,'Brush Script MT',cursive" font-size="52" fill="#1FA05A" stroke="#F2EBDA" stroke-width="2.4" paint-order="stroke">Verde</text>
+<path d="M30,72 C90,66 150,64 228,57 C185,68 130,74 75,76Z" fill="#1FA05A" stroke="#F2EBDA" stroke-width="1.4"/></g></svg></a>
   <nav id="nav"></nav>
 </div></header>
 <main id="app"></main>
