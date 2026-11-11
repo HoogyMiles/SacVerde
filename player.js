@@ -135,6 +135,22 @@ function plFacts(p, s, sv){
   return F;
 }
 
+// ---------- bid history from the league's Free Agency sheet (season_archive kind 'fa_bids_sheet') ----------
+const plNorm = n=>String(n||"").toLowerCase().replace(/\b(jr|sr|ii|iii|iv|v)\b\.?/g,"").replace(/[^a-z0-9]/g,"");
+async function plSheetBids(p){
+  if(!window.__faSheet){
+    const {data} = await sb.from("season_archive").select("key,data").eq("season", LIVE.season.year).eq("kind","fa_bids_sheet");
+    window.__faSheet = (data||[]).map(r=>r.data);
+  }
+  const ids = {}; Object.entries(LIVE.teamsById||{}).forEach(([id,n])=>ids[n]=+id);
+  const k = plNorm(p.name), out = [];
+  window.__faSheet.forEach(w=>(w.players||[]).forEach(([name,pos,bids])=>{
+    if(plNorm(name)!==k || pos!==p.pos) return;
+    bids.forEach(([rk,team,amt])=>{ if(ids[team]) out.push({week:w.week, team_id:ids[team], amount:amt, rank:rk, src:"sheet"}); });
+  }));
+  return out;
+}
+
 // ---------- the card ----------
 let PC = null;    // {p, tab, sv, pts}
 window.openPlayer = async function(arg, pos){
@@ -148,7 +164,10 @@ window.openPlayer = async function(arg, pos){
     sb.from("bid_weeks").select("id,week,status").eq("season",yr)]);
   if(!PC || PC.p!==p) return;
   const wk = {}; (bw.data||[]).forEach(w=>wk[w.id]=w);
-  const revealed = (bids.data||[]).filter(b=>wk[b.bid_week_id] && wk[b.bid_week_id].status==="revealed").map(b=>({...b, week:wk[b.bid_week_id].week}));
+  const sheetBids = await plSheetBids(p);
+  const sheetWeeks = new Set((window.__faSheet||[]).map(w=>w.week));
+  const revealed = (bids.data||[]).filter(b=>wk[b.bid_week_id] && wk[b.bid_week_id].status==="revealed" && !sheetWeeks.has(wk[b.bid_week_id].week))
+    .map(b=>({...b, week:wk[b.bid_week_id].week})).concat(sheetBids);
   const pts = {}; (pw.data||[]).forEach(r=>pts[r.week]=+r.points);
   const tx = (LIVE.tx||[]).filter(x=>x.player_id===p.id);
   const sheet = []; Object.entries(LIVE.txSheet||{}).forEach(([team, lines])=>(lines||[]).forEach(l=>{ if(String(l).includes(p.name)) sheet.push({team, l}); }));
@@ -227,7 +246,7 @@ function pcSV(p, own){
   return `<h4>Status</h4><div>${status}</div>
     <h4>Revealed bids · ${LIVE.season.year}</h4>${bids.length?`<div class="pc-tbl"><table><tr><th>Week</th><th>Team</th><th class="r">Bid</th></tr>
       ${Object.keys(byWeek).sort((a,b)=>b-a).map(w=>byWeek[w].map((b,i)=>`<tr><td>${i?"":"<b>"+w+"</b>"}</td><td><span style="display:inline-block;width:4px;height:12px;border-radius:2px;background:${hmColors(LIVE.teamsById[b.team_id]).c};margin-right:6px"></span>${esc(LIVE.teamsById[b.team_id])}</td><td class="r">${i?"":"<b>"}${money(b.amount)}${i?"":"</b>"}</td></tr>`).join("")).join("")}</table></div>
-      <div class="sm mut2" style="margin-top:6px">Only revealed weeks. Sealed bids stay hidden until the Tuesday reveal.</div>`:'<div class="sm mut">No revealed bids on him this season.</div>'}
+      <div class="sm mut2" style="margin-top:6px">Weeks from the league's Free Agency sheet, plus site bids after each Tuesday reveal.</div>`:'<div class="sm mut">No revealed bids on him this season.</div>'}
     <h4>Transactions · ${LIVE.season.year}</h4>${lines.length?lines.map(l=>`<div class="pc-fact"><span>•</span><span>${esc(l.t)}${l.w?` <span class="mut2">(wk ${l.w})</span>`:""}</span></div>`).join(""):'<div class="sm mut">No moves this season.</div>'}`;
 }
 function pcBio(p, s){
