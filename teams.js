@@ -14,6 +14,8 @@ const TEAM_IMG = {
   "Rhin-Owned": "img/teams/rhin-owned.jpg",
   "da bombers": "img/teams/da-bombers.jpg",
   "Pool Boy": "img/teams/pool-boy.jpg",
+  "Purple Reign": "img/teams/purple-reign.jpg",
+  "Steel Curtain": "img/teams/steel-curtain.jpg",
 };
 // Optional focus point per image when the crop cuts off the subject (CSS object-position, e.g. "center 10%")
 const TEAM_IMG_POS = {
@@ -22,6 +24,8 @@ const TEAM_IMG_POS = {
   "Rhin-Owned": "center 2%",
   "Assassins": "center 45%",
   "Pool Boy": "center 35%",
+  "Purple Reign": "center 40%",
+  "Steel Curtain": "center 85%",
 };
 const tcPos = n => TEAM_IMG_POS[n] || "center";
 
