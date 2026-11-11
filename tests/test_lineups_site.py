@@ -53,7 +53,7 @@ with sync_playwright() as p:
     check("no JS errors (commissioner)", not errs, "; ".join(errs))
     # another manager sees Hoogy's lineup + matchup lineups
     pg, errs = page_as(br, "tritons")
-    pg.evaluate("go('teams'); state.team='Roaring Hoogy'; render()"); pg.wait_for_timeout(400)
+    pg.evaluate("goTeam('Roaring Hoogy')"); pg.wait_for_timeout(400)
     body = pg.inner_text("body").upper()
     i = [body.find(x) for x in ("STARTING LINEUP · WEEK 8", "BENCH ·", "\nIR\n", "TAXI SQUAD")]
     check("team page: Starting Lineup → Bench → IR → Taxi", all(x >= 0 for x in i) and i == sorted(i), str(i))
@@ -82,7 +82,7 @@ with sync_playwright() as p:
     pg.evaluate("go('myteam')"); pg.wait_for_timeout(600)
     body = pg.inner_text("body")
     check("without 020 the old roster view still works", "YOUR 2026 ROSTER" in body.upper() and "Keenan Allen" in body and "STARTING LINEUP" not in body.upper())
-    pg.evaluate("go('teams'); state.team='Roaring Hoogy'; render()"); pg.wait_for_timeout(300)
+    pg.evaluate("goTeam('Roaring Hoogy')"); pg.wait_for_timeout(300)
     check("without 020 team page shows Active Roster", "ACTIVE ROSTER" in pg.inner_text("body").upper())
     pg.evaluate("go('office')"); pg.wait_for_timeout(300)
     check("without 020 no Lineups admin tab", "Lineups" not in pg.inner_text(".tabs") if pg.locator(".tabs").count() else True)
