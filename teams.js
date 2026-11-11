@@ -31,6 +31,20 @@ const TEAM_IMG_POS = {
   "Milky Wet Hogs": "center 30%",
   "Roaring Hoogy": "center 25%",
 };
+// Edge colors of each image (left, right), so the row fades blend into the picture instead of black. Auto-picked from the images.
+const TEAM_IMG_TINT = {
+  "Alligator Arms": ["#1b2c21", "#212a1e"],
+  "K2's Kings": ["#311816", "#452213"],
+  "Assassins": ["#281f1f", "#252522"],
+  "Juggernauts": ["#462520", "#41251e"],
+  "Rhin-Owned": ["#27282a", "#262322"],
+  "da bombers": ["#383f31", "#3f4738"],
+  "Pool Boy": ["#4d1d2a", "#542113"],
+  "Purple Reign": ["#47280c", "#633310"],
+  "Steel Curtain": ["#311e16", "#5f351a"],
+  "Milky Wet Hogs": ["#372a1b", "#5f4e3a"],
+  "Roaring Hoogy": ["#0b3c28", "#115d29"],
+};
 const tcPos = n => TEAM_IMG_POS[n] || "center";
 
 document.head.insertAdjacentHTML("beforeend", `<style>
@@ -51,6 +65,9 @@ document.head.insertAdjacentHTML("beforeend", `<style>
 .tc-meta b{color:#fff}
 /* League Home: team image behind each team's row in the scoreboard, standings and playoff bracket */
 .sb-row,.st-row,.br-t{position:relative;isolation:isolate}
+.sb-row::after,.st-row::after,.br-t::after{content:"";position:absolute;inset:0;z-index:-2;pointer-events:none;
+  background:linear-gradient(90deg,transparent 14%,var(--tl,transparent) 34%,var(--tl,transparent) 50%,var(--tr,transparent) 72%,var(--tr,transparent) 100%)}
+.br-t::after{background:linear-gradient(90deg,transparent 20%,var(--tl,transparent) 42%,var(--tl,transparent) 56%,var(--tr,transparent) 80%,var(--tr,transparent) 100%)}
 .sb-row::before,.st-row::before,.br-t::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background-image:var(--timg,none);background-repeat:no-repeat;
   background-size:auto 210%;background-position:var(--tposx,64%) var(--tposy,40%);opacity:.95;
   -webkit-mask-image:linear-gradient(90deg,transparent 30%,#000 48%,#000 74%,transparent 90%);mask-image:linear-gradient(90deg,transparent 30%,#000 48%,#000 74%,transparent 90%);transition:opacity .15s}

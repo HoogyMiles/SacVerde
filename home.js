@@ -103,7 +103,7 @@ const hmVars = name=>{ const k = hmColors(name);
   // team image behind the team's row (scoreboard, standings, bracket) once it has one in TEAM_IMG (teams.js)
   const img = typeof TEAM_IMG !== "undefined" && TEAM_IMG[name];
   const pos = (typeof TEAM_IMG_POS!=="undefined"&&TEAM_IMG_POS[name])||"center 40%", y = pos.split(" ")[1]||"40%";
-  return `--c:${k.c};--b:${k.b}` + (img ? `;--timg:url('${img}');--tposy:${y}` : ""); };
+  return `--c:${k.c};--b:${k.b}` + (img ? `;--timg:url('${img}');--tposy:${y}` + ((typeof TEAM_IMG_TINT!=="undefined"&&TEAM_IMG_TINT[name])?`;--tl:${TEAM_IMG_TINT[name][0]};--tr:${TEAM_IMG_TINT[name][1]}`:"") : ""); };
 const hmPT = (d, o)=>new Date(d).toLocaleString([], {timeZone:"America/Los_Angeles", ...o});
 
 // Midnight PT at the start of the first Wednesday after time t (handles PST/PDT)
