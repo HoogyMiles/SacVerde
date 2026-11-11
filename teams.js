@@ -51,12 +51,12 @@ document.head.insertAdjacentHTML("beforeend", `<style>
 .tc-meta b{color:#fff}
 /* League Home: team image behind each team's row in the scoreboard, standings and playoff bracket */
 .sb-row,.st-row,.br-t{position:relative;isolation:isolate}
-.sb-row::before,.st-row::before,.br-t::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background-image:var(--timg,none);background-size:cover;background-position:var(--tpos,center);
-  opacity:.75;-webkit-mask-image:linear-gradient(90deg,rgba(0,0,0,.35) 0%,#000 55%);mask-image:linear-gradient(90deg,rgba(0,0,0,.35) 0%,#000 55%);transition:opacity .15s}
-.sb-row::after,.st-row::after,.br-t::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(90deg,rgba(10,10,12,.82) 0%,rgba(10,10,12,.45) 50%,rgba(10,10,12,.62) 100%);opacity:0}
-.sb-row[style*="--timg"]::after,.st-row[style*="--timg"]::after,.br-t[style*="--timg"]::after{opacity:1}
+.sb-row::before,.st-row::before,.br-t::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background-image:var(--timg,none);background-repeat:no-repeat;
+  background-size:auto 210%;background-position:var(--tposx,64%) var(--tposy,40%);opacity:.95;
+  -webkit-mask-image:linear-gradient(90deg,transparent 30%,#000 48%,#000 74%,transparent 90%);mask-image:linear-gradient(90deg,transparent 30%,#000 48%,#000 74%,transparent 90%);transition:opacity .15s}
+.br-t::before{--tposx:70%;background-size:auto 260%}
 .sb-row[style*="--timg"],.st-row[style*="--timg"],.br-t[style*="--timg"]{text-shadow:0 1px 3px #000,0 0 6px rgba(0,0,0,.9)}
-.sb-card:hover .sb-row::before,.st-row:hover::before{opacity:1}
+.sb-card:hover .sb-row::before,.st-row:hover::before{opacity:1;filter:brightness(1.15)}
 .tc-back{display:inline-flex;align-items:center;gap:6px;margin:0 0 10px;background:transparent;border:1px solid var(--line);color:var(--fg,#eee);border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer}
 .tc-back:hover{border-color:#888}
 </style>`);
