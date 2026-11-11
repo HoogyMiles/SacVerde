@@ -99,7 +99,10 @@ function hmColors(name){
     c = (bgm && bgm[1]) || (cm && cm[1]) || c; }
   return HM_ACCENT[name] = {c, b};
 }
-const hmVars = name=>{ const k = hmColors(name); return `--c:${k.c};--b:${k.b}`; };
+const hmVars = name=>{ const k = hmColors(name);
+  // team image behind the team's row (scoreboard, standings, bracket) once it has one in TEAM_IMG (teams.js)
+  const img = typeof TEAM_IMG !== "undefined" && TEAM_IMG[name];
+  return `--c:${k.c};--b:${k.b}` + (img ? `;--timg:url('${img}');--tpos:${(typeof TEAM_IMG_POS!=="undefined"&&TEAM_IMG_POS[name])||"center"}` : ""); };
 const hmPT = (d, o)=>new Date(d).toLocaleString([], {timeZone:"America/Los_Angeles", ...o});
 
 // Midnight PT at the start of the first Wednesday after time t (handles PST/PDT)

@@ -89,9 +89,13 @@ with sync_playwright() as p:
     pg.evaluate("go('financials')"); pg.wait_for_timeout(300)
     check("old Financials link lands in Teams → Financials", "Weekly High Scores" in pg.inner_text("main"))
     check("no JS errors (nav)", not errs, "; ".join(errs))
+    # ---- team images behind rows on League Home ----
+    pg.evaluate("go('home')"); pg.wait_for_timeout(800)
+    check("scoreboard rows carry team images", pg.evaluate("[...document.querySelectorAll('.sb-row')].filter(r=>r.style.getPropertyValue('--timg')).length") >= 10)
+    check("standings rows carry team images", pg.evaluate("[...document.querySelectorAll('.st-row')].filter(r=>r.style.getPropertyValue('--timg')).length") >= 11)
     # ---- My Team backdrop ----
     pg.evaluate("go('myteam')"); pg.wait_for_timeout(800)
-    check("My Team shows the team's art as a backdrop", pg.locator(".mt-wrap .mt-bg .tbg-stage").count() == 1)
+    check("My Team shows the team's art as a backdrop", pg.locator(".mt-wrap .mt-bg .tbg-stage").count() + pg.locator(".mt-wrap .mt-bg img").count() == 1)
     pg.screenshot(path=f"{SHOTS}/myteam_bg.png")
     pg.mouse.wheel(0, 1400); pg.wait_for_timeout(400)
     check("backdrop stays in view while scrolling", pg.evaluate("getComputedStyle(document.querySelector('.mt-bg')).position") == "fixed")
