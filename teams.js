@@ -7,7 +7,7 @@
 // Drop a generated image into img/teams/ and list it here to replace the drawn art on that team's card
 // (and behind its team page header). Leave a team out to keep its drawn art.
 const TEAM_IMG = {
-  // "Pool Boy": "img/teams/pool-boy.jpg",
+  "Alligator Arms": "img/teams/alligator-arms.jpg",
 };
 
 document.head.insertAdjacentHTML("beforeend", `<style>
