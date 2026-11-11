@@ -8,7 +8,13 @@
 // (and behind its team page header). Leave a team out to keep its drawn art.
 const TEAM_IMG = {
   "Alligator Arms": "img/teams/alligator-arms.jpg",
+  "K2's Kings": "img/teams/k2s-kings.jpg",
 };
+// Optional focus point per image when the crop cuts off the subject (CSS object-position, e.g. "center 10%")
+const TEAM_IMG_POS = {
+  "K2's Kings": "center 6%",
+};
+const tcPos = n => TEAM_IMG_POS[n] || "center";
 
 document.head.insertAdjacentHTML("beforeend", `<style>
 .tc-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
@@ -33,7 +39,7 @@ document.head.insertAdjacentHTML("beforeend", `<style>
 const tcSlug = t => String(t).toLowerCase().replace(/'/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 function tcArt(name){
-  if(TEAM_IMG[name]) return `<img class="tc-img" src="${TEAM_IMG[name]}" alt="" loading="lazy">`;
+  if(TEAM_IMG[name]) return `<img class="tc-img" src="${TEAM_IMG[name]}" alt="" loading="lazy" style="object-position:${tcPos(name)}">`;
   const A = typeof TEAM_ART !== "undefined" && TEAM_ART[name], V = typeof TEAM_ART_VALS !== "undefined" && TEAM_ART_VALS[name], t = DATA.teams[name];
   if(!A || !V || !t) return "";
   try{
@@ -83,7 +89,7 @@ if(typeof teamHero === "function"){
     const html = _heroPrev(name, ...rest);
     if(!html || !TEAM_IMG[name]) return html;
     return html.replace(/<div class="tbg-stage" aria-hidden="true">[\s\S]*?<\/div>\s*<div class="tbg-shade">/,
-      `<div class="tbg-stage" aria-hidden="true" style="width:100%;transform:none"><img src="${TEAM_IMG[name]}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:right center"></div>
+      `<div class="tbg-stage" aria-hidden="true" style="width:100%;transform:none"><img src="${TEAM_IMG[name]}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${TEAM_IMG_POS[name]||"right center"}"></div>
     <div class="tbg-shade" style="display:block;opacity:.85">`);
   };
 }

@@ -46,7 +46,7 @@ document.head.insertAdjacentHTML("beforeend", `<style>
 </style>`);
 function teamBackdrop(name){
   try{
-    if(typeof TEAM_IMG!=="undefined" && TEAM_IMG[name]) return `<div class="mt-bg" style="background:#0a0a0b"><img src="${TEAM_IMG[name]}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.9"></div>`;
+    if(typeof TEAM_IMG!=="undefined" && TEAM_IMG[name]) return `<div class="mt-bg" style="background:#0a0a0b"><img src="${TEAM_IMG[name]}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${tcPos(name)};opacity:.9"></div>`;
     const A = TEAM_ART[name], V = TEAM_ART_VALS[name], t = DATA.teams[name]; if(!A || !V || !t) return "";
     const art = tbgRender(A.tpl, V(tbgRoster(t, t.info||{})));
     return `<div class="mt-bg" style="background:${A.bg}"><div class="tbg-stage" aria-hidden="true"><div style="position:absolute;inset:0;background:${A.bg}"></div>${art}</div></div>`;
