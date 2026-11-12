@@ -18,4 +18,5 @@ insert into bids (bid_week_id, team_id, player_id, amount) select 1, (select id 
 SQL
 echo "bids seeded: $($P -d sv -tA -c 'select count(*) from bids')"
 (python3 -m http.server 8080 -d /home/claude/repo >/tmp/http.log 2>&1 &); sleep 1
+[ -n "$NOBROWSER" ] && exit 0
 cd /home/claude/e2e && timeout 300 python3 ${TEST:-test_site.py}

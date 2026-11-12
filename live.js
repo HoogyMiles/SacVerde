@@ -849,7 +849,7 @@ function adminLogins(){
   if(!state.loginCodes){ sb.rpc("admin_login_codes").then(({data})=>{ state.loginCodes = {}; (data||[]).forEach(r=>state.loginCodes[r.email]=r); if(state.adminTab==="logins") render(); }); return `<div class="sm mut">Loading…</div>`; }
   const lc = state.loginCodes;
   return `<div class="sm" style="margin-bottom:8px">Managers sign in with a <b>username + password</b>. To set one up they tap “First time?” on the login screen and enter their <b>team code</b> (text it to them; it works once).
-    Forgot password: hit <b>Reset</b> and send the new code. To let them reuse the same username, also delete the old account in Supabase → Authentication → Users (search the username).</div>
+    Forgot password: hit <b>Reset</b> and send the new code. They can sign up again with the same username.</div>
   <table><tr><th>Team</th><th>Email (on file)</th><th>Name</th><th>Username</th><th>Team code</th><th></th></tr>
   ${(LIVE.members||[]).sort((a,b)=>(LIVE.teamsById[a.team_id]||"").localeCompare(LIVE.teamsById[b.team_id]||"")).map((m,i)=>{ const c = lc[m.email]||{};
     return `<tr><td><select id="mt_${i}">${opts(m.team_id)}</select></td>

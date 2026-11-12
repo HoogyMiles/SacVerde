@@ -39,3 +39,27 @@ select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-00000000
 select 'L11 old account lost team: ' || (not is_member())::text;
 reset role;
 select 'L12 log: ' || string_agg(distinct kind, ', ') from transactions where kind in ('login_reset');
+-- 022: Reset frees the username (old account deleted, or retired if it has forum posts)
+select 'L12 old k2kings account deleted: ' || (not exists (select 1 from auth.users where email='k2kings@users.sacverde.app'))::text;
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000a4','k2kings@users.sacverde.app');
+insert into auth.identities (user_id, identity_data) values ('00000000-0000-0000-0000-0000000000a4','{"email":"k2kings@users.sacverde.app"}');
+select set_config('sv.k2code2', pg_temp.code('k2smith@yahoo.com'), false);
+select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-0000000000a4"}',false); set role authenticated;
+select 'L13 same username again: ' || (claim_login(current_setting('sv.k2code2'), 'k2kings')->>'ok');
+reset role;
+insert into forum_messages (team_id, author, body) values ((select team_id from league_members where email='k2smith@yahoo.com'), '00000000-0000-0000-0000-0000000000a4', 'hi');
+insert into auth.sessions (user_id) values ('00000000-0000-0000-0000-0000000000a4');
+select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000001"}',false); set role authenticated;
+select 'L14 ' || admin_reset_login('k2smith@yahoo.com') like '%retired%';
+reset role;
+select 'L15 retired: ' || (select (email like 'k2kings.old%@users.sacverde.app' and banned_until = 'infinity')::text from auth.users where id='00000000-0000-0000-0000-0000000000a4')
+  || ' identity renamed: ' || (select (identity_data->>'email' like 'k2kings.old%')::text from auth.identities where user_id='00000000-0000-0000-0000-0000000000a4')
+  || ' signed out: ' || (not exists (select 1 from auth.sessions where user_id='00000000-0000-0000-0000-0000000000a4'))::text
+  || ' post kept: ' || exists (select 1 from forum_messages where author='00000000-0000-0000-0000-0000000000a4')::text
+  || ' username free: ' || (not exists (select 1 from auth.users where email='k2kings@users.sacverde.app'))::text;
+-- an email-link login is never touched
+update league_members set login_user_id = '00000000-0000-0000-0000-000000000003' where email='kaiser0505@gmail.com';
+select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000001"}',false); set role authenticated;
+select 'L16 ' || left(admin_reset_login('kaiser0505@gmail.com'), 12);
+reset role;
+select 'L16b email account kept: ' || exists (select 1 from auth.users where email='kaiser0505@gmail.com')::text;
