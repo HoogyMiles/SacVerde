@@ -37,6 +37,10 @@ h2 .sub,{font-weight:400}
 .g4{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
 .card h3{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--mut);margin-bottom:10px}
+details.alerts>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px}
+details.alerts>summary::-webkit-details-marker{display:none}
+details.alerts>summary::before{content:"▸";color:var(--mut);font-size:12px}
+details.alerts[open]>summary::before{content:"▾"}
 table{width:100%;border-collapse:collapse;font-size:13.5px}
 th{color:var(--mut2);font-size:11px;text-transform:uppercase;letter-spacing:.8px;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
 td{padding:7px 8px;border-bottom:1px solid #202024}

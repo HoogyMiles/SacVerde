@@ -530,11 +530,19 @@ function vMyTeam(){
 function alertsHTML(){
   const ns = (LIVE.notes||[]).slice(0,12); if(!ns.length) return "";
   const unread = ns.filter(n=>!n.read_at).map(n=>n.id);
-  if(unread.length) setTimeout(markRead, 1500, unread);
-  return `<div class="card" style="margin-bottom:14px"><h3>Alerts</h3>${ns.map(n=>`<div style="padding:7px 0;border-bottom:1px solid var(--line)${n.read_at?";opacity:.7":""}">
+  // Collapsed by default; alerts only get marked read once you open the tab.
+  if(state.alertsOpen && unread.length) setTimeout(markRead, 1500, unread);
+  return `<details class="card alerts" style="margin-bottom:14px"${state.alertsOpen?" open":""} ontoggle="alertsToggle(this.open)">
+    <summary><h3 style="display:inline;margin:0">Alerts</h3>${unread.length?` <span class="pill r">${unread.length} new</span>`:` <span class="sm mut2">(${ns.length})</span>`}</summary>
+    <div style="margin-top:8px">${ns.map(n=>`<div style="padding:7px 0;border-bottom:1px solid var(--line)${n.read_at?";opacity:.7":""}">
     <div class="spread"><b class="sm">${n.read_at?"":"● "}${esc(n.title)}</b><span class="sm mut2">${fmtTime(n.created_at)}</span></div>
     ${n.body?`<div class="sm mut" style="white-space:pre-line">${esc(n.body)}</div>`:""}
-    ${n.view && n.view!=="myteam"?`<a class="sm" onclick="go('${n.view}')${n.view==="bids"?";state.bidTab='reveal'":""}">open →</a>`:""}</div>`).join("")}</div>`;
+    ${n.view && n.view!=="myteam"?`<a class="sm" onclick="go('${n.view}')${n.view==="bids"?";state.bidTab='reveal'":""}">open →</a>`:""}</div>`).join("")}</div></details>`;
+}
+function alertsToggle(open){
+  if(open === !!state.alertsOpen) return;
+  state.alertsOpen = open;
+  if(open){ const unread=(LIVE.notes||[]).slice(0,12).filter(n=>!n.read_at).map(n=>n.id); if(unread.length) setTimeout(markRead, 1500, unread); }
 }
 async function markRead(ids){
   await sb.from("notifications").update({read_at:new Date().toISOString()}).in("id", ids);
