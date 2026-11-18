@@ -13,11 +13,43 @@ document.head.insertAdjacentHTML("beforeend", `<style>
 .lu-slot{width:46px;font-weight:800;font-size:12px}
 .lu-p{flex:1 1 200px;min-width:0}
 .lu-sub{font-size:12px;color:var(--mut);margin-top:2px}
-.lu-sal{width:44px;text-align:right}
+.lu-sal{width:58px;text-align:right}
+.lu-sal .ctr{margin:4px 0 0}
 .lu-pts{width:62px;text-align:right;font-weight:700}
 .lu-act{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 .lu-act select{width:150px}
 @media (max-width:600px){ .lu-act{width:100%} .lu-act select{width:auto;flex:1;max-width:200px} }
+/* injury / bye tags (Option A: tinted starter rows + stripe; bench gets the tag only) */
+.lu-pill,.mt-wrap .lu-pill{display:inline-block;font-size:11px;font-weight:800;line-height:1;padding:3px 6px;border-radius:5px;margin-left:6px;vertical-align:1px;letter-spacing:.3px}
+.lu-pill.out,.mt-wrap .lu-pill.out{background:#E24B4A;color:#fff}
+.lu-pill.q,.mt-wrap .lu-pill.q{background:#EF9F27;color:#2b1a00}
+.lu-pill,.mt-wrap .lu-pill,.ctr,.mt-wrap .ctr,.mt-wrap .lu-pill *,.mt-wrap .ctr *{text-shadow:none!important}
+.lu-row.lu-out{background:rgba(226,75,74,.24);border-left:4px solid #E24B4A;padding-left:8px;padding-right:8px;margin:0 -8px}
+.lu-row.lu-q{background:rgba(239,159,39,.2);border-left:4px solid #EF9F27;padding-left:8px;padding-right:8px;margin:0 -8px}
+.lu-stat,.mt-wrap .lu-stat{font-size:12px;font-weight:700;margin-top:2px}
+.lu-stat.out,.mt-wrap .lu-stat.out{color:#ff9e9d}
+.lu-stat.q,.mt-wrap .lu-stat.q{color:#ffd27a}
+/* cap bar */
+.cap-top{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px 22px}
+.cap-lbl,.mt-wrap .cap-lbl{font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#cfd0d6}
+.cap-big{font-size:40px;font-weight:900;line-height:1.05}
+.cap-big.ok{color:#4fd18b}.cap-big.low{color:#f2b13c}.cap-big.over{color:#ff6b6a}
+.cap-left,.mt-wrap .cap-left{font-size:14px;font-weight:700;color:#e4e4e8;margin-left:4px}
+.cap-stats{display:flex;gap:22px;flex-wrap:wrap}
+.cap-stats b{display:block;font-size:20px;color:#fff}
+.cap-bar{height:12px;border-radius:6px;background:rgba(255,255,255,.14);margin:12px 0 8px;overflow:hidden}
+.cap-bar i{display:block;height:100%;border-radius:6px}
+/* tap-to-swap */
+.lu-hint{position:sticky;top:8px;z-index:6;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#123a66;border:1px solid #378ADD;color:#fff;border-radius:10px;padding:10px 12px;margin-top:14px}
+.lu-row.lu-sel{background:rgba(55,138,221,.32);outline:2px solid #378ADD;outline-offset:-2px;border-radius:6px}
+.lu-row.lu-tgt{outline:2px dashed #7fb3ff;outline-offset:-3px;border-radius:6px;cursor:pointer}
+.lu-row.lu-tgt:hover,.lu-row.lu-tgt:focus{background:rgba(127,179,255,.18)}
+.lu-row.lu-dim{opacity:.4}
+.lu-go,.mt-wrap .lu-go{font-size:12px;font-weight:800;color:#9cc6ff;white-space:nowrap}
+.lu-benchtgt{padding:10px 8px;font-weight:700}
+.ctr,.mt-wrap .ctr{display:inline-block;font-size:11px;font-weight:800;line-height:1;padding:3px 6px;border-radius:5px;margin-left:6px;vertical-align:1px;border:1px solid rgba(255,255,255,.45);color:#f1f1f4;background:rgba(255,255,255,.08);white-space:nowrap}
+.ctr.last,.mt-wrap .ctr.last{border-color:#EF9F27;color:#ffd27a}
+.ctr.f,.mt-wrap .ctr.f{border-color:#d4a72c;background:#d4a72c;color:#2b1d00}
 </style>`);
 const slotFits = (slot, pos)=>({QB:["QB"],RB1:["RB"],RB2:["RB"],WR1:["WR"],WR2:["WR"],TE:["TE"],FLEX:["RB","WR","TE"],K:["K"],DST:["DST"]}[slot]||[]).includes(pos);
 
@@ -70,8 +102,39 @@ setInterval(async ()=>{
   }catch(e){}
 }, 60000);
 
+// NFL injury report + NFL IR (injuries.json, built by tools/injuries.py every few hours Wed-Sun)
+LIVE.inj = null;
+function loadInjuries(){
+  if(LIVE.injLoading) return LIVE.injLoading;
+  LIVE.injLoading = fetch("injuries.json", {cache:"no-cache"}).then(r=>r.ok?r.json():null).then(d=>{ LIVE.inj = d || {players:{}};
+      if(["myteam"].includes(state.view)) render(); }).catch(()=>{ LIVE.inj = {players:{}}; });
+  return LIVE.injLoading;
+}
+function injFor(p){
+  if(!LIVE.inj || !p || !p.name || p.pos==="DST") return null;
+  const c = LIVE.inj.players[nflNorm(p.name)+"|"+p.pos]; if(!c || !c.length) return null;
+  const hit = c.find(x=>x.t===p.nfl_team); if(hit) return hit;
+  // team on file not updated yet (trade/signing): still match when the name is unique on both sides
+  if(c.length!==1 || p.nfl_team==="FA") return null;
+  const n = nflNorm(p.name); return LIVE.players.filter(x=>x.active && x.pos===p.pos && nflNorm(x.name)===n).length===1 ? c[0] : null;
+}
+// One status per player for the week: no NFL team / bye / NFL IR / Out / Doubtful / Questionable (null = healthy)
+function luStatus(p, week){
+  if(!p || !p.pos) return null;
+  if(p.nfl_team==="FA") return {tag:"FA", cls:"out", txt:"No NFL team", dead:true};
+  if(!gameFor(p, week)) return {tag:"BYE", cls:"out", txt:"Bye week", dead:true};
+  const j = injFor(p); if(!j) return null;
+  const part = j.i ? " · "+esc(j.i) : "";
+  if(j.s==="IR") return {tag:"IR", cls:"out", txt:"NFL "+esc(j.i||"injured reserve"), dead:true};
+  if(j.s==="OUT") return {tag:"OUT", cls:"out", txt:"Out"+part, dead:true};
+  if(j.s==="D") return {tag:"D", cls:"out", txt:"Doubtful"+part};
+  if(j.s==="Q") return {tag:"Q", cls:"q", txt:"Questionable"+part};
+  return null;
+}
+const luPill = st=>st?`<span class="lu-pill ${st.cls}" title="${st.txt.replace(/"/g,"")}">${st.tag}</span>`:"";
+
 const _loadSeason = loadSeason;
-loadSeason = async function(){ await _loadSeason();
+loadSeason = async function(){ await _loadSeason(); loadInjuries();
   try { await loadLineups(); } catch(e){ LIVE.hasLineups = false; LIVE.lineups = []; }
   try { if(LIVE.hasLineups) await loadScoring(); else LIVE.hasScoring = false; } catch(e){ LIVE.hasScoring = false; } };
 
@@ -145,6 +208,30 @@ function lineupMove(target, pid, fromSlot){
   return setSlot(target, pid);
 }
 
+// ---------- tap-to-swap ----------
+// state.luSel = {pid, slot}: slot "" = bench player, pid null = empty slot. Returns [slot, player] for set_lineup_slot, or null.
+function luAction(sel, tgt, wk){
+  const P = id=>id ? LIVE.byId[id] : null, L = p=>!!(p && isLocked(p, wk));
+  const A = P(sel.pid), B = P(tgt.pid);
+  if(tgt.slot==="__bench") return sel.slot && A ? [sel.slot, null] : null;
+  if(sel.slot && !tgt.slot){                    // lineup slot ← bench player
+    if(!B || L(B) || !slotFits(sel.slot, B.pos)) return null; return [sel.slot, tgt.pid]; }
+  if(!sel.slot && tgt.slot){                    // bench player → lineup slot
+    if(!A || L(B) || !slotFits(tgt.slot, A.pos)) return null; return [tgt.slot, sel.pid]; }
+  if(sel.slot && tgt.slot && sel.slot!==tgt.slot){
+    if(A){                                      // starter → another slot (straight swap only)
+      if(!slotFits(tgt.slot, A.pos)) return null;
+      if(B && (L(B) || !slotFits(sel.slot, B.pos))) return null;
+      return [tgt.slot, sel.pid]; }
+    if(!B || L(B) || !slotFits(sel.slot, B.pos)) return null; return [sel.slot, tgt.pid];   // empty slot ← another starter
+  }
+  return null;
+}
+function luPick(pid, slot){ state.luSel = {pid: pid||null, slot: slot||""}; render(); }
+function luCancel(){ state.luSel = null; render(); }
+function luGo(slot, pid){ state.luSel = null; render(); return setSlot(slot, pid); }
+document.addEventListener("keydown", e=>{ if(e.key==="Escape" && state.luSel){ luCancel(); } });
+
 // ---------- My Team ----------
 const _myRosterHTML = myRosterHTML;
 myRosterHTML = function(){
@@ -152,6 +239,11 @@ myRosterHTML = function(){
   const me = LIVE.me.team_id, wk = LIVE.season.current_week, cap = capInfo(me);
   if(!LIVE.roster26.some(r=>r.team_id===me)) return "";
   const s = teamSections(me, wk), iss = lineupIssues(me, wk);
+  // drop a stale selection (player moved / dropped since)
+  let sel = state.luSel;
+  if(sel){ const m = lineupMap(me, wk);
+    const ok = sel.slot ? (m[sel.slot]||null)===(sel.pid||null) : s.bench.some(b=>b.player_id===sel.pid);
+    if(!ok) sel = state.luSel = null; }
   const late = LIVE.deadline && new Date() >= new Date(LIVE.deadline);
   const warn = [
     iss.empty.length ? `<div class="note" style="border-color:var(--red)">⚠️ Empty lineup slot${iss.empty.length>1?"s":""}: <b>${iss.empty.map(x=>SLOT_LABEL[x]+(x.match(/\d/)?" "+x.slice(-1):"")).join(", ")}</b>. ${late?`<b class="red">The Sunday 9:55 AM PT deadline has passed.</b>`:`Fill ${iss.empty.length>1?"them":"it"} by <b>${LIVE.deadline?fmtPT(LIVE.deadline):"Sunday 9:55 AM PT"}</b> or it's an <b>automatic loss</b> for the week.`}</div>` : "",
@@ -159,18 +251,53 @@ myRosterHTML = function(){
     iss.fa.length ? `<div class="note">Starting a player with no NFL team: <b>${iss.fa.map(esc).join(", ")}</b>.</div>` : ""
   ].join("");
   const btns = r=>`${rosterButtons(r)}<button class="btn ghost sm" onclick="dropPlayer(${r.player_id})">drop</button>`;
-  const row = (slotLbl, r, fromSlot, moves)=>`<div class="lu-row" data-pid="${r?r.player_id:""}" data-slot="${fromSlot||""}">
+  const row = (slotLbl, r, fromSlot, moves)=>{
+    const st = r ? luStatus(r.p, wk) : null, starter = !!fromSlot;
+    const ref = {pid: r ? r.player_id : null, slot: fromSlot||""};
+    const locked = r && isLocked(r.p, wk);
+    let cls = starter && st ? (st.cls==="q" ? " lu-q" : " lu-out") : "", act = "", attrs = "";
+    if(moves && sel){
+      const me2 = (sel.pid||null)===ref.pid && sel.slot===ref.slot;
+      const a = me2 ? null : luAction(sel, ref, wk);
+      if(me2){ cls += " lu-sel"; act = `<button class="btn ghost sm" onclick="luCancel()">Cancel</button>`; }
+      else if(a){ cls += " lu-tgt"; act = `<span class="lu-go">${sel.pid ? (r ? "Swap here" : "Move here") : "Start him"}</span>`;
+        attrs = ` role="button" tabindex="0" onclick="luGo('${a[0]}', ${a[1]==null?"null":a[1]})" onkeydown="if(event.key==='Enter')this.click()"`; }
+      else cls += " lu-dim";
+    } else if(moves){
+      act = locked ? `<span class="sm mut2" title="Game has kicked off — locked for the week">locked</span>`
+        : r ? `<button class="btn sm" onclick="luPick(${r.player_id}, '${fromSlot||""}')">Swap</button>`
+            : `<button class="btn sm" onclick="luPick(null, '${fromSlot}')">Fill</button>`;
+    }
+    const sub = r ? (starter && st && st.cls ? `<div class="lu-sub">${r.p.nfl_team} · ${gameCell(r.p, wk)}</div><div class="lu-stat ${st.cls}">${st.txt}${st.dead?" — won't score":""}</div>`
+                                     : `<div class="lu-sub">${r.p.nfl_team} · ${gameCell(r.p, wk)}${st && !["BYE","FA"].includes(st.tag) ? ` · <span class="lu-stat ${st.cls}" style="display:inline">${st.txt}</span>` : ""}</div>`) : "";
+    return `<div class="lu-row${cls}" data-pid="${r?r.player_id:""}" data-slot="${fromSlot||""}"${attrs}>
     <div class="lu-slot">${slotLbl}</div>
-    <div class="lu-p">${r?`<span class="pos ${r.p.pos}">${r.p.pos}</span> ${plLink(r.p.name,r.p.pos,r.player_id)}<div class="lu-sub">${r.p.nfl_team} · ${gameCell(r.p, wk)}</div>`:`<span class="red sm">Empty</span>`}</div>
-    <div class="lu-sal">${r?money(r.salary):""}</div>
+    <div class="lu-p">${r?`<span class="pos ${r.p.pos}">${r.p.pos}</span> ${sel?esc(r.p.name):plLink(r.p.name,r.p.pos,r.player_id)}${luPill(st)}${sub}`:`<span class="red sm">Empty</span>`}</div>
+    <div class="lu-sal">${r?money(r.salary):""}${r&&!r.gone?`<div>${ctrTag(r.contract, r.status)}</div>`:""}</div>
     ${LIVE.hasScoring?`<div class="lu-pts">${r?`${playerLive(r.p, wk)?'<span class="live-dot"></span>':""}${fmtPts(ptsOf(r.player_id, wk))}`:""}</div>`:""}
-    <div class="lu-act">${moves?moveSelect(me, wk, r, fromSlot):""}${r&&!r.gone?btns(r):""}</div></div>`;
+    <div class="lu-act">${act}${r&&!r.gone&&!sel?btns(r):""}</div></div>`; };
   const sect = (title, rows)=>`<div class="card" style="margin-top:14px"><h3>${title}</h3>${rows}</div>`;
-  return `<div class="card" style="margin-top:14px"><h3>Your ${LIVE.season.year} Roster · ${cap.count}/${LIVE.season.roster_size} active · ${money(cap.used)} of $${LIVE.season.salary_cap}</h3>
-      <div class="sm mut">Week ${wk} lineup. Players lock at their game's kickoff. No changes → last week's lineup carries over.</div></div>
-    ${warn}
+  // cap bar
+  const irRelief = LIVE.roster26.filter(r=>r.team_id===me && r.status==="ir").reduce((t,r)=>t+Math.floor(r.salary/2),0);
+  const capMax = LIVE.season.salary_cap, sp = cap.space;
+  const tone = sp < 0 ? "over" : sp < 5 ? "low" : "ok", barC = {ok:"#3fbf7a", low:"#EF9F27", over:"#E24B4A"}[tone];
+  const capCard = `<div class="card cap-card" style="margin-top:14px">
+      <div class="cap-top">
+        <div><div class="cap-lbl">${LIVE.season.year} cap space</div><span class="cap-big ${tone}">${sp<0?"−$"+(-sp):"$"+sp}</span><span class="cap-left">${sp<0?"over the cap":"left"}</span></div>
+        <div class="cap-stats">
+          <div><span class="cap-lbl">Used</span><b>${money(cap.used)} / $${capMax}</b></div>
+          <div><span class="cap-lbl">Roster</span><b>${cap.count} / ${LIVE.season.roster_size}</b></div>
+          ${irRelief?`<div><span class="cap-lbl">IR relief</span><b>${money(irRelief)}</b></div>`:""}
+        </div></div>
+      <div class="cap-bar"><i style="width:${Math.max(0, Math.min(100, cap.used/capMax*100)).toFixed(1)}%;background:${barC}"></i></div>
+      <div class="sm mut">Week ${wk} lineup. Tap <b>Swap</b> on a player, then tap where he goes. Players lock at their game's kickoff. No changes → last week's lineup carries over.</div></div>`;
+  const selP = sel && sel.pid ? LIVE.byId[sel.pid] : null;
+  const hint = sel ? `<div class="lu-hint"><span>${selP ? `Moving <b>${esc(selP.name)}</b>` : `Filling <b>${SLOT_LABEL[sel.slot]}${sel.slot.match(/\d/)?" "+sel.slot.slice(-1):""}</b>`} — tap a highlighted spot.</span><button class="btn ghost sm" onclick="luCancel()">Cancel</button></div>` : "";
+  const benchTgt = sel && sel.slot && sel.pid ? `<div class="lu-row lu-tgt lu-benchtgt" role="button" tabindex="0" onclick="luGo('${sel.slot}', null)" onkeydown="if(event.key==='Enter')this.click()"><span class="lu-go">Move ${esc(selP.name)} to the bench</span></div>` : "";
+  return `${capCard}
+    ${warn}${hint}
     ${sect(`Starting Lineup · Week ${wk}${LIVE.hasScoring?` · ${fmtPts(teamTotal(me, wk))} pts`:""}`, s.starters.map(x=>row(SLOT_LABEL[x.slot], x.r, x.slot, true)).join(""))}
-    ${sect(`Bench · ${s.bench.length}`, s.bench.map(r=>row("BN", r, null, true)).join("") || `<div class="sm mut2">Nobody on the bench.</div>`)}
+    ${sect(`Bench · ${s.bench.length}`, benchTgt + (s.bench.map(r=>row("BN", r, null, true)).join("") || `<div class="sm mut2">Nobody on the bench.</div>`))}
     ${s.ir.length?sect(`IR · ${s.ir.length}/${LIVE.season.max_ir}`, s.ir.map(r=>row("IR", r, null, false)).join("")):""}
     ${s.taxi.length?sect(`Taxi Squad · ${s.taxi.length}/${LIVE.season.max_taxi}`, s.taxi.map(r=>row("TAXI", r, null, false)).join("")):""}`;
 };

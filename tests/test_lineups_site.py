@@ -19,22 +19,63 @@ with sync_playwright() as p:
     check("all 9 slots listed", pg.locator(".card:has-text('Starting Lineup') .lu-row").count() == 9)
     check("locked starter shows the lock", "🔒" in pg.inner_text(row('Jason Myers')) and "locked" in pg.inner_text(row('Jason Myers')))
     check("bye-week player shows BYE", "BYE" in pg.inner_text(row('Christian McCaffrey')))
-    # bench → FLEX via the Move dropdown (swap with Jack Bech)
-    sel = pg.locator(row('Keenan Allen')+" select")
-    flex_val = [o for o in sel.locator("option").all_inner_texts() if o.startswith("W/R/T")]
-    sel.select_option(label=flex_val[0])
-    pg.wait_for_function("document.body.innerText.includes('Keenan Allen is in your FLEX slot')", timeout=15000)
-    check("Move dropdown puts a bench player in FLEX", at("Roaring Hoogy", "FLEX") == "Keenan Allen")
+    # ---- tap-to-swap ----
+    def tap(pid_name):   # tap the Swap/Fill button on a row
+        pg.locator((row(pid_name) if pid_name else ".lu-row[data-pid='']")+" .lu-act button").first.click(); pg.wait_for_timeout(150)
+    def go_to(sel, msg):
+        pg.locator(sel).first.click(); pg.wait_for_function(f"document.body.innerText.includes({msg!r})", timeout=15000)
+    tap('Keenan Allen')
+    check("tap Swap shows the hint bar", "Moving Keenan Allen" in pg.inner_text(".lu-hint"))
+    check("FLEX (Jack Bech) lights up as a target", "lu-tgt" in pg.get_attribute(row('Jack Bech'), "class"))
+    check("illegal spots are dimmed (QB)", "lu-dim" in pg.get_attribute(row('Jayden Daniels'), "class"))
+    check("locked starter is not a target", "lu-tgt" not in pg.get_attribute(row('Jaxon Smith-Njigba'), "class"))
+    pg.keyboard.press("Escape"); pg.wait_for_timeout(150)
+    check("Escape cancels the swap", pg.locator(".lu-hint").count() == 0)
+    tap('Keenan Allen'); go_to(row('Jack Bech'), "Keenan Allen is in your FLEX slot")
+    check("bench player → FLEX in two taps", at("Roaring Hoogy", "FLEX") == "Keenan Allen")
     check("old FLEX goes to the bench", "Jack Bech" in pg.inner_text(".card:has-text('Bench ·')"))
-    # bench a starter → empty-slot warning
-    pg.locator(row('Emeka Egbuka')+" select").select_option(label="Bench")
-    pg.wait_for_function("document.body.innerText.includes('Emeka Egbuka moved to the bench')", timeout=15000)
+    # starter → bench player directly (no benching first)
+    tap('Emeka Egbuka'); go_to(row('Deebo Samuel Sr.'), "Deebo Samuel Sr. is in your WR2 slot")
+    check("starter swaps straight with a bench player", at("Roaring Hoogy", "WR2") == "Deebo Samuel Sr." and "Emeka Egbuka" in pg.inner_text(".card:has-text('Bench ·')"))
+    # starter ↔ starter
+    tap('Keenan Allen'); go_to(row('Deebo Samuel Sr.'), "Keenan Allen is in your WR2 slot")
+    check("starter ↔ starter swap", at("Roaring Hoogy", "WR2") == "Keenan Allen" and at("Roaring Hoogy", "FLEX") == "Deebo Samuel Sr.")
+    # move to the bench → empty slot warning
+    tap('Keenan Allen'); go_to(".lu-benchtgt", "Keenan Allen moved to the bench")
     body = pg.inner_text("body")
     check("empty slot warning mentions automatic loss", "Empty lineup slot: WR 2" in body and "automatic loss" in body, body[:900])
-    # fill the empty slot from the Start… dropdown
-    pg.locator(".lu-row[data-pid=''] select").select_option(label="Emeka Egbuka (WR)")
-    pg.wait_for_function("document.body.innerText.includes('Emeka Egbuka is in your WR2 slot')", timeout=15000)
-    check("Start… dropdown fills the empty slot", at("Roaring Hoogy", "WR2") == "Emeka Egbuka" and "Empty lineup slot" not in pg.inner_text("body"))
+    # fill the empty slot
+    tap(None)
+    check("Fill highlights eligible bench players only", "lu-tgt" in pg.get_attribute(row('Emeka Egbuka'), "class") and "lu-tgt" not in (pg.get_attribute(row('Cole Kmet'), "class") or ""))
+    go_to(row('Emeka Egbuka'), "Emeka Egbuka is in your WR2 slot")
+    check("Fill puts a bench player in the empty slot", at("Roaring Hoogy", "WR2") == "Emeka Egbuka" and "Empty lineup slot" not in pg.inner_text("body"))
+    # ---- cap bar ----
+    used = int(sql("select sum(case when status='ir' then salary - salary/2 else salary end) from roster_spots r join teams t on t.id=r.team_id where t.name='Roaring Hoogy' and r.season=2026 and status in ('active','ir')"))
+    cap_txt = pg.inner_text(".cap-card")
+    check("cap bar shows cap space, used, roster", f"${170-used}" in cap_txt.replace("−","-") and f"${used} / $170" in cap_txt and "ROSTER" in cap_txt.upper(), cap_txt)
+    # ---- injury / bye tags (mock injuries.json) ----
+    inj = {"updated": "test", "players": {"bijanrobinson|RB": [{"t": "ATL", "s": "Q", "i": "Ankle", "w": 8}],
+            "colstonloveland|TE": [{"t": "CHI", "s": "OUT", "i": "Hamstring", "w": 8}],
+            "colekmet|TE": [{"t": "CHI", "s": "IR", "i": "Injured reserve"}],
+            "keenanallen|WR": [{"t": "LAC", "s": "OUT", "i": "Knee", "w": 8}]}}   # team on file is stale, name unique → still matches
+    pg.context.route("**/injuries.json", lambda r: r.fulfill(status=200, json=inj))
+    pg.reload(); pg.wait_for_function("document.querySelector('#nav') && document.querySelector('#nav').innerText.includes('sign out')", timeout=30000)
+    pg.evaluate("go('myteam')"); pg.wait_for_function("document.querySelector('.lu-pill.q')", timeout=15000)
+    lv = pg.locator(row('Colston Loveland'))
+    check("OUT starter: red tinted row + OUT tag + won't score", "lu-out" in lv.get_attribute("class") and "OUT" in lv.inner_text() and "Out · Hamstring — won't score" in lv.inner_text(), lv.inner_text())
+    bj = pg.locator(row('Bijan Robinson'))
+    check("Questionable starter: amber row + Q tag", "lu-q" in bj.get_attribute("class") and "Questionable · Ankle" in bj.inner_text())
+    km = pg.locator(row('Cole Kmet'))
+    check("bench IR player: tag only, no row tint", "IR" in km.inner_text() and "lu-out" not in km.get_attribute("class"))
+    cm = pg.locator(row('Christian McCaffrey'))
+    check("bench bye player shows BYE tag", cm.locator(".lu-pill").inner_text() == "BYE")
+    check("stale NFL team on file still gets the tag (unique name)", pg.locator(row('Keenan Allen')+" .lu-pill").inner_text() == "OUT")
+    pg.screenshot(path="/home/claude/e2e/myteam_injuries.png", full_page=True)
+    # ---- contract year chips ----
+    ctr = lambda n: pg.locator(row(n)+" .ctr").inner_text() if pg.locator(row(n)+" .ctr").count() else ""
+    check("contract chips: blank = Yr 1, keeper = Yr 2/3, franchise = Yr 5 F", ctr('Keenan Allen') == "Yr 1" and ctr('Colston Loveland') == "Yr 2"
+          and ctr('Jayden Daniels') == "Yr 3" and ctr('Christian McCaffrey') == "Yr 5 F", f"{ctr('Keenan Allen')}|{ctr('Colston Loveland')}|{ctr('Jayden Daniels')}|{ctr('Christian McCaffrey')}")
+    check("taxi players get no contract chip", ctr('Malachi Fields') == "")
     pg.screenshot(path="/home/claude/e2e/myteam_lineup_hoogy.png", full_page=True)
     # IR move from My Team clears the slot (Bijan → IR), then refill RB from bench is offered
     pg.locator(row('Bijan Robinson')+" button:has-text('IR')").click()
@@ -57,7 +98,8 @@ with sync_playwright() as p:
     body = pg.inner_text("body").upper()
     i = [body.find(x) for x in ("STARTING LINEUP · WEEK 8", "BENCH ·", "\nIR\n", "TAXI SQUAD")]
     check("team page: Starting Lineup → Bench → IR → Taxi", all(x >= 0 for x in i) and i == sorted(i), str(i))
-    check("other managers can see the lineup", "Keenan Allen" in pg.inner_text(".card:has-text('Starting Lineup')"))
+    check("other managers can see the lineup", "Emeka Egbuka" in pg.inner_text(".card:has-text('Starting Lineup')"))
+    check("team page shows contract chips by the salary", pg.locator(".card:has-text('Starting Lineup') td.r .ctr").count() == 9 and "Yr 5 F" in pg.inner_text(".card:has-text('Starting Lineup')") and pg.locator(".card:has-text('Bench ·') td.r .ctr").count() >= 1)
     pg.screenshot(path="/home/claude/e2e/team_lineup.png", full_page=True)
     pg.evaluate("go('match'); state.week=8; render()"); pg.wait_for_timeout(400)
     body = pg.inner_text("body")
