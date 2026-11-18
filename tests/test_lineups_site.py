@@ -59,6 +59,10 @@ with sync_playwright() as p:
             "colekmet|TE": [{"t": "CHI", "s": "IR", "i": "Injured reserve"}],
             "keenanallen|WR": [{"t": "LAC", "s": "OUT", "i": "Knee", "w": 8}]}}   # team on file is stale, name unique → still matches
     pg.context.route("**/injuries.json", lambda r: r.fulfill(status=200, json=inj))
+    # season averages for best-fit ordering: Allen 15 (but OUT), McCaffrey 20 (but bye), Bech 5 (healthy)
+    for nm, pts in (("Keenan Allen", 15), ("Christian McCaffrey", 20), ("Jack Bech", 5)):
+        sql(f"""insert into player_week_stats (season, week, player_id, stats, points) select 2026, w, (select id from players where name={lit(nm)} and active), '{{}}'::jsonb, {pts}
+                from generate_series(1,7) w on conflict do nothing""")
     pg.reload(); pg.wait_for_function("document.querySelector('#nav') && document.querySelector('#nav').innerText.includes('sign out')", timeout=30000)
     pg.evaluate("go('myteam')"); pg.wait_for_function("document.querySelector('.lu-pill.q')", timeout=15000)
     lv = pg.locator(row('Colston Loveland'))
@@ -71,6 +75,17 @@ with sync_playwright() as p:
     check("bench bye player shows BYE tag", cm.locator(".lu-pill").inner_text() == "BYE")
     check("stale NFL team on file still gets the tag (unique name)", pg.locator(row('Keenan Allen')+" .lu-pill").inner_text() == "OUT")
     pg.screenshot(path="/home/claude/e2e/myteam_injuries.png", full_page=True)
+    # ---- best fit on top while swapping ----
+    tap('Deebo Samuel Sr.')   # FLEX
+    order = pg.eval_on_selector_all(".card:has-text('Bench ·') .lu-row.lu-tgt[data-pid]", "els=>els.map(e=>e.querySelector('.lu-p').innerText.split('\\n')[0])")
+    check("bench reorders: healthy first, then by season average", [o.split(" ",1)[1].replace(" ","") for o in order[:3]] == ["JackBech", "ChristianMcCaffreyBYE", "KeenanAllenOUT"], str(order))
+    top = pg.locator(".card:has-text('Bench ·') .lu-row[data-pid]").first
+    check("top option is labeled Best fit with its average", "Best fit" in top.inner_text() and "5.0 avg" in top.inner_text(), top.inner_text())
+    pg.evaluate("window.scrollTo(0, document.querySelector('.lu-benchtgt').getBoundingClientRect().top + scrollY - 300)"); pg.wait_for_timeout(200)
+    hb = pg.evaluate("[document.querySelector('header').getBoundingClientRect().bottom, document.querySelector('.lu-hint').getBoundingClientRect().top]")
+    check("Moving… bar stays visible below the sticky header when scrolled", hb[1] >= hb[0] and hb[1] < hb[0] + 30, str(hb))
+    pg.screenshot(path="/home/claude/e2e/myteam_bestfit.png")
+    pg.keyboard.press("Escape"); pg.wait_for_timeout(150)
     # ---- contract year chips ----
     ctr = lambda n: pg.locator(row(n)+" .ctr").inner_text() if pg.locator(row(n)+" .ctr").count() else ""
     check("contract chips: blank = Yr 1, keeper = Yr 2/3, franchise = Yr 5 F", ctr('Keenan Allen') == "Yr 1" and ctr('Colston Loveland') == "Yr 2"
